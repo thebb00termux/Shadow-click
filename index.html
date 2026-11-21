@@ -40,19 +40,41 @@ const hash=(pw,s)=>hex(pbkdf2(enc(pw),unhex(s),ITER)),newSalt=()=>hex(crypto.get
 const acc=()=>{try{return JSON.parse(LS.getItem(AK)||'{}')}catch(e){return{}}};
 let a=null;
 if(SS.getItem('stAdmin')==='1')a={user:'admin',name:'admin',admin:true};
-else{const k=LS.getItem('stSession_v1'),c=acc()[k];if(c)a={user:k,name:c.n,admin:false}}
+else{const k=LS.getItem('stSession_v1'),c=acc()[k];if(c)a={user:k,name:c.n,admin:false,local:SS.getItem('stLocal')==='1'}}
 window.__AUTH=a;
-window.__stAuth={logout(){LS.removeItem('stSession_v1');SS.removeItem('stAdmin');location.reload()},hash:pw=>{const s=newSalt();return{s,h:hash(pw,s)}},_test:(pw,s)=>hash(pw,s)};
+window.__stAuth={logout(){LS.removeItem('stSession_v1');SS.removeItem('stAdmin');SS.removeItem('stLocal');const done=()=>location.reload();try{if(window.firebase&&firebase.auth&&firebase.apps.length){Promise.race([firebase.auth().signOut(),new Promise(r=>setTimeout(r,1500))]).then(done,done);return}}catch(e){}done()},hash:pw=>{const s=newSalt();return{s,h:hash(pw,s)}},_test:(pw,s)=>hash(pw,s)};
 if(a)return;
 const $=id=>document.getElementById(id),ov=$('authOverlay'),u=$('authUser'),p=$('authPass'),p2=$('authPass2'),msg=$('authMsg'),go=$('authGo');ov.style.display='flex';
 let mode='login';
 document.querySelectorAll('.auth-tabs button').forEach(b=>b.onclick=()=>{mode=b.dataset.tab;document.querySelectorAll('.auth-tabs button').forEach(x=>x.classList.toggle('on',x===b));p2.style.display=mode==='register'?'':'none';p.autocomplete=mode==='register'?'new-password':'current-password';go.textContent={login:'Đăng nhập',register:'Tạo tài khoản',admin:'Đăng nhập Admin'}[mode];u.value=mode==='admin'?'admin':'';p.value=p2.value='';msg.textContent=''});
 const fail=t=>{msg.textContent=t;go.disabled=false};
-$('authForm').onsubmit=e=>{e.preventDefault();go.disabled=true;msg.textContent='Đang xử lý…';setTimeout(()=>{try{submit()}catch(x){fail('Có lỗi xảy ra, thử lại nhé.')}},30)};
-function submit(){const name=u.value.trim(),key=name.toLowerCase(),pw=p.value,A=acc();
-if(mode==='admin'){if(key!=='admin'||hash(pw,ADMIN_DEF.s)!==ADMIN_DEF.h)return fail('Sai tài khoản hoặc mật khẩu admin.');SS.setItem('stAdmin','1');return location.reload()}
-if(mode==='register'){if(!/^[A-Za-z0-9_]{3,20}$/.test(name))return fail('Tên 3–20 ký tự: chữ, số hoặc dấu _');if(key==='admin'||A[key])return fail('Tên này đã được dùng.');if(pw.length<6)return fail('Mật khẩu tối thiểu 6 ký tự.');if(pw!==p2.value)return fail('Mật khẩu nhập lại không khớp.');const s=newSalt();A[key]={n:name,s,h:hash(pw,s)};LS.setItem(AK,JSON.stringify(A));LS.setItem('stSession_v1',key);return location.reload()}
-const c=A[key];if(!c||hash(pw,c.s)!==c.h)return fail('Sai tên hoặc mật khẩu.');LS.setItem('stSession_v1',key);location.reload()}
+const FBCFG={apiKey:"AIzaSyBCsXWTTDlEPdvLZAme9l6hvEWkin_Vt-w",authDomain:"shadow-tap-abyss-clicker.firebaseapp.com",projectId:"shadow-tap-abyss-clicker",storageBucket:"shadow-tap-abyss-clicker.firebasestorage.app",messagingSenderId:"1012157878985",appId:"1:1012157878985:web:8b276ba670ce6d3704f318"};
+const SDKB='https://www.gstatic.com/firebasejs/10.12.2/',EM=k=>k+'@shadowtap.game';
+const loadJS=u=>new Promise((r,j)=>{const s=document.createElement('script');s.src=u;s.onload=r;s.onerror=()=>j({code:'auth/network-request-failed'});document.head.appendChild(s)});
+let sdkP=null;const sdk=()=>sdkP||(sdkP=(async()=>{if(!window.firebase)await loadJS(SDKB+'firebase-app-compat.js');if(!firebase.auth)await loadJS(SDKB+'firebase-auth-compat.js');if(!firebase.apps.length)firebase.initializeApp(FBCFG);return firebase})().catch(e=>{sdkP=null;throw e}));
+const MSG={'auth/email-already-in-use':'Tên này đã được dùng.','auth/invalid-credential':'Sai tên hoặc mật khẩu.','auth/wrong-password':'Sai tên hoặc mật khẩu.','auth/user-not-found':'Sai tên hoặc mật khẩu.','auth/invalid-login-credentials':'Sai tên hoặc mật khẩu.','auth/too-many-requests':'Thử quá nhiều lần, hãy đợi vài phút rồi thử lại.','auth/operation-not-allowed':'Chưa bật Email/Password trong Firebase (Authentication → Sign-in method).','auth/network-request-failed':'Không kết nối được Firebase. Kiểm tra mạng rồi thử lại.','auth/unauthorized-domain':'Tên miền này chưa được thêm vào Firebase (Authentication → Settings → Authorized domains).','auth/weak-password':'Mật khẩu tối thiểu 6 ký tự.','auth/invalid-email':'Tên không hợp lệ.'};
+const errMsg=e=>{const c=(e&&e.code)||'';return MSG[c]||('Lỗi đăng nhập: '+((e&&e.message)||c||'không rõ'))};
+const OFFLINE=['auth/network-request-failed','auth/operation-not-allowed','auth/unauthorized-domain','auth/internal-error'];
+{const note=SS.getItem('stNote');if(note){msg.textContent=note;SS.removeItem('stNote')}}
+$('authForm').onsubmit=e=>{e.preventDefault();go.disabled=true;msg.textContent='Đang xử lý…';setTimeout(()=>{submit().catch(x=>fail(errMsg(x)))},30)};
+async function submit(){const name=u.value.trim(),key=name.toLowerCase(),pw=p.value,A=acc();
+if(mode==='admin'){if(key!=='admin'||hash(pw,ADMIN_DEF.s)!==ADMIN_DEF.h)return fail('Sai tài khoản hoặc mật khẩu admin.');
+ try{const f=await sdk();await f.auth().signInWithEmailAndPassword(EM('admin'),pw)}catch(e){/* chưa có tài khoản admin trên Firebase: vẫn vào được, nhưng quyền admin online sẽ bị hạn chế */}
+ SS.setItem('stAdmin','1');return location.reload()}
+if(mode==='register'){if(!/^[A-Za-z0-9_]{3,20}$/.test(name))return fail('Tên 3–20 ký tự: chữ, số hoặc dấu _');if(key==='admin')return fail('Tên này đã được dùng.');if(A[key])return fail('Tên này đã có trên máy này. Hãy bấm Đăng nhập (tài khoản cũ sẽ tự chuyển lên online).');if(pw.length<6)return fail('Mật khẩu tối thiểu 6 ký tự.');if(pw!==p2.value)return fail('Mật khẩu nhập lại không khớp.');
+ const f=await sdk(),cr=await f.auth().createUserWithEmailAndPassword(EM(key),pw);try{await cr.user.updateProfile({displayName:name})}catch(e){}
+ A[key]={n:name};LS.setItem(AK,JSON.stringify(A));LS.setItem('stSession_v1',key);SS.removeItem('stLocal');return location.reload()}
+if(!/^[A-Za-z0-9_]{3,20}$/.test(name))return fail('Sai tên hoặc mật khẩu.');
+const c=A[key],okLocal=!!(c&&c.h&&hash(pw,c.s)===c.h);
+try{const f=await sdk();
+ try{await f.auth().signInWithEmailAndPassword(EM(key),pw)}
+ catch(e){const code=(e&&e.code)||'';
+  if(okLocal&&(code==='auth/user-not-found'||code==='auth/invalid-credential'||code==='auth/invalid-login-credentials')){
+   try{const cr=await f.auth().createUserWithEmailAndPassword(EM(key),pw);try{await cr.user.updateProfile({displayName:c.n||name})}catch(e3){}}
+   catch(e2){if(((e2&&e2.code)||'')==='auth/email-already-in-use')return fail('Sai tên hoặc mật khẩu.');throw e2}
+  }else throw e}
+ const cu=f.auth().currentUser,nm=(c&&c.n)||(cu&&cu.displayName)||name;A[key]=Object.assign({},c||{},{n:nm});LS.setItem(AK,JSON.stringify(A));LS.setItem('stSession_v1',key);SS.removeItem('stLocal');location.reload()
+}catch(e){if(okLocal&&OFFLINE.includes((e&&e.code)||'')){LS.setItem('stSession_v1',key);SS.setItem('stLocal','1');return location.reload()}throw e}}
 })();</script><div class="wrap"><header class="top"><div><div class="brand">☠ SHADOW TAP: ABYSS</div><div class="sub">Dark fantasy clicker · Thức tỉnh vực sâu</div></div><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap"><button class="pill" id="musicBtn" type="button">🎵 Bật nhạc</button><button class="pill" id="notationBtn" type="button">Kiểu tiền: Qa</button><button class="pill" id="currencyGuideBtn" type="button">📚 Hướng dẫn &amp; tiền tệ</button><button class="pill" id="adminToggle" type="button" style="border-color:#c28cff;color:#fff;background:#43255d;font-weight:900">🛠️ MỞ BẢNG ADMIN</button><span class="pill" id="versionTag">BẢN ADMIN</span><button class="pill" id="logoutBtn" type="button">🚪 Đăng xuất</button></div></header>
 <div class="stats"><div class="stat"><div class="num" id="money">0</div><div class="lab">✦ Linh hồn</div></div><div class="stat"><div class="num" id="power">1</div><div class="lab">Sức mạnh / chạm</div></div><div class="stat"><div class="num" id="perSec">0</div><div class="lab">Linh hồn / giây</div></div></div>
 <div class="layout"><section class="card altar"><div class="pill" id="realm">TẦNG 1 · HẦM MỘ VỠ</div><div style="height:13px"></div><button class="orb" id="orb" aria-label="Chạm để thu linh hồn"><span>👁️</span></button><h2 style="margin:13px 0 0">Con Mắt Vực Sâu</h2><div class="small" id="tapHint">Chạm vào cổ vật để hút linh hồn</div><button class="tapbtn" id="tapBtn">⚡ HÚT LINH HỒN</button><div class="row section" style="width:100%"><span class="small">Tiến độ thức tỉnh</span><b id="progressText">0 / 100</b></div><div class="progress" style="width:100%;margin-top:5px"><div class="bar" id="progressBar"></div></div><button class="primary" id="rebirthBtn">♻ TÁI SINH · yêu cầu 1e6</button><div class="small" id="rebirthInfo">Tái sinh đặt lại nâng cấp, nhận +1 Huy hiệu Vực Sâu.</div><button class="primary" id="superRebirthBtn" style="width:100%;margin-top:8px">🌌 SIÊU TÁI SINH · yêu cầu 1</button><div class="small" id="superRebirthInfo">Siêu tái sinh nhận +1 Huy hiệu Siêu Tái Sinh, tăng sức mạnh vĩnh viễn ×10 và giữ lại 75% gear.</div><button class="primary" id="legendRebirthBtn" style="width:100%;margin-top:8px"></button><div class="small" id="legendRebirthInfo"></div><button class="primary" id="ultraRebirthBtn" style="width:100%;margin-top:8px"></button><div class="small" id="ultraRebirthInfo"></div></section>
@@ -73,23 +95,18 @@ const c=A[key];if(!c||hash(pw,c.s)!==c.h)return fail('Sai tên hoặc mật kh�
  <div class="extra-card"><h2>🪄 Cửa hàng cổ vật</h2><p>Dùng tinh thể để mở khóa diện mạo mới cho Con Mắt Vực Sâu. Mỗi diện mạo có hiệu ứng riêng.</p><div class="skin-list" id="skinList"></div></div>
  <div class="extra-card"><h2>📜 Nhiệm vụ vực sâu</h2><p>Hoàn thành mục tiêu để nhận thêm linh hồn hoặc tinh thể.</p><div id="questList"></div></div>
  <div class="extra-card"><h2>📖 Nhật ký thám hiểm</h2><p>Các sự kiện quan trọng được ghi lại tại đây.</p><div class="log" id="eventLog"><div>🌑 Bạn bước vào vực sâu lần đầu.</div></div><button class="wide-btn" id="clearLogBtn">Xóa nhật ký</button></div>
- <div class="extra-card music-player-card"><h2>🎵 YouTube Music Search</h2>
- <p>Tìm video/nhạc trên YouTube ngay trong game. Chọn kết quả để phát bằng trình phát YouTube.</p>
- <label class="music-label" for="ytApiKey">🔑 YouTube Data API Key</label>
- <input class="field" id="ytApiKey" type="password" autocomplete="off" placeholder="Dán API Key của bro vào đây">
- <div class="music-controls" style="grid-template-columns:1fr auto;margin-top:8px">
-  <button class="wide-btn" type="button" id="ytKeyToggle">👁 Hiện key</button>
-  <button class="wide-btn" type="button" id="ytClearKey">Xóa key</button>
- </div>
- <label class="music-label" for="ytSearchInput">🔎 Tìm bài hát / nghệ sĩ</label>
- <div class="adminrow"><input class="field" id="ytSearchInput" maxlength="100" placeholder="Ví dụ: nhạc chill, phonk..." style="margin:0"><button class="wide-btn" id="ytSearchBtn" type="button" style="margin:0;max-width:112px">Tìm kiếm</button></div>
- <div class="small" id="ytSearchStatus" role="status" aria-live="polite" style="margin-top:8px">Nhập API Key và từ khóa để tìm nhạc.</div>
- <div id="ytResults" style="display:grid;gap:8px;margin-top:10px"></div>
- <div class="music-now" id="ytNowPlaying">Chưa chọn video</div>
- <div id="ytPlayerBox" style="display:none;width:100%;aspect-ratio:16/9;background:#08060d;border-radius:12px;overflow:hidden;margin-top:8px"></div>
- <div class="music-controls" style="margin-top:8px"><button class="wide-btn" id="ytPlayBtn" type="button">▶️ Phát</button><button class="wide-btn" id="ytPauseBtn" type="button">⏸️ Tạm dừng</button><button class="wide-btn" id="ytStopBtn" type="button">⏹️ Dừng</button></div>
- <label class="music-label" for="ytVolume">🔊 Âm lượng: <span id="ytVolumeText">50%</span></label><input id="ytVolume" class="volume-slider" type="range" min="0" max="100" value="50">
- <p class="small">API Key không được lưu vào game. Hãy giới hạn key theo website của bro và chỉ bật YouTube Data API v3. YouTube có thể hiển thị quảng cáo và yêu cầu cookie/đăng nhập tùy video.</p></div>
+ <div class="extra-card music-player-card"><h2>🎵 Nhạc YouTube</h2>
+<p>Dán link video hoặc danh sách phát YouTube để nghe nhạc ngay trong game. Bấm Phát một lần để trình duyệt cho phép âm thanh.</p>
+<input class="field" id="ytLink" type="text" inputmode="url" placeholder="Dán link YouTube (video hoặc playlist)" autocomplete="off">
+<button class="wide-btn" id="ytAdd">▶️ Phát link này</button>
+<div class="music-label">✨ Gợi ý nhanh</div>
+<div class="music-controls" id="ytPresets"></div>
+<div class="music-now" id="ytNow">Chưa chọn bài. Dán link hoặc bấm một gợi ý.</div>
+<div id="ytBox" class="hidden" style="width:100%;height:200px;border-radius:12px;overflow:hidden;background:#000;margin:8px 0"><div id="ytPlayer"></div></div>
+<div class="music-controls"><button class="wide-btn" id="ytPlay">▶️ Phát</button><button class="wide-btn" id="ytPrev">⏮️ Trước</button><button class="wide-btn" id="ytNext">⏭️ Sau</button></div>
+<label class="music-label" for="ytVol">🔊 Âm lượng: <span id="ytVolText">50%</span></label><input id="ytVol" class="volume-slider" type="range" min="0" max="100" value="50">
+<div class="music-label">📚 Danh sách của bạn</div><div id="ytList" class="small"></div>
+<div class="small">Nhạc phát trực tiếp từ YouTube nên cần có mạng. Game không lưu hay tải nhạc về.</div></div>
 <div class="extra-card"><h2>💾 Dữ liệu & âm thanh</h2><p>Sao lưu tiến trình để chuyển máy. Nhạc nền và hiệu ứng âm thanh được điều khiển riêng.</p><button class="wide-btn" id="exportBtn">📤 Xuất mã lưu</button><textarea id="saveCode" class="field" rows="3" placeholder="Mã sao lưu sẽ hiện ở đây"></textarea><button class="wide-btn" id="importBtn">📥 Nhập mã lưu</button><button class="wide-btn" id="sfxBtn">🔔 Hiệu ứng: Bật</button></div>
 </section>
 
@@ -362,83 +379,67 @@ $('autoBuyBtn').addEventListener('click',()=>{state.autoBuy=!state.autoBuy;save(
 setInterval(()=>{if(state.autoBuy&&buyAllUpgrades()>0){save();render()}},1000);
 setInterval(save,3000);document.addEventListener('visibilitychange',()=>{if(document.hidden)save()});
 
-/* YouTube Music Search: YouTube Data API v3 + IFrame Player API */
+/* Nhạc YouTube: dùng YouTube IFrame Player API (không cần API key) */
 (()=>{
- const $=id=>document.getElementById(id);
- const keyInput=$('ytApiKey'),queryInput=$('ytSearchInput'),status=$('ytSearchStatus');
- const results=$('ytResults'),playerBox=$('ytPlayerBox');
- let player=null,selectedVideo=null;
- function setStatus(t){status.textContent=t}
- function loadPlayerApi(){
-  if(window.YT&&window.YT.Player)return Promise.resolve();
-  if(window.__ytApiPromise)return window.__ytApiPromise;
-  window.__ytApiPromise=new Promise((resolve,reject)=>{
-   const oldReady=window.onYouTubeIframeAPIReady;
-   window.onYouTubeIframeAPIReady=()=>{if(typeof oldReady==='function')oldReady();resolve()};
-   const script=document.createElement('script');
-   script.src='https://www.youtube.com/iframe_api';
-   script.onerror=()=>reject(new Error('Không tải được YouTube Player API. Kiểm tra mạng.'));
-   document.head.appendChild(script);
-  });
-  return window.__ytApiPromise;
- }
- function playVideo(videoId,title){
-  selectedVideo={id:videoId,title};
-  $('ytNowPlaying').textContent='🎵 Đang chọn: '+title;
-  playerBox.style.display='block';
-  loadPlayerApi().then(()=>{
-   if(!player){
-    player=new YT.Player('ytPlayerBox',{width:'100%',height:'100%',videoId,
-     playerVars:{playsinline:1,rel:0},
-     events:{
-      onReady:e=>{e.target.setVolume(Number($('ytVolume').value));e.target.playVideo()},
-      onError:e=>setStatus('YouTube không phát được video này (mã '+e.data+'). Thử video khác nhé.'),
-      onStateChange:e=>{
-       if(e.data===YT.PlayerState.PLAYING)$('ytNowPlaying').textContent='▶️ Đang phát: '+title;
-       if(e.data===YT.PlayerState.PAUSED)$('ytNowPlaying').textContent='⏸️ Đã tạm dừng: '+title;
-       if(e.data===YT.PlayerState.ENDED)$('ytNowPlaying').textContent='Đã phát xong: '+title;
-      }
-     }});
-   }else{player.loadVideoById(videoId);player.setVolume(Number($('ytVolume').value))}
-   playerBox.scrollIntoView({behavior:'smooth',block:'center'});
-  }).catch(e=>setStatus(e.message));
- }
- function addResult(item){
-  const id=item.id.videoId,sn=item.snippet||{},card=document.createElement('div');
-  card.className='upgrade';card.style.alignItems='center';
-  const thumb=document.createElement('img');thumb.src=sn.thumbnails?.default?.url||'';thumb.alt='';
-  thumb.style.cssText='width:100px;height:56px;object-fit:cover;border-radius:7px;flex-shrink:0';
-  const info=document.createElement('div');info.className='utxt';
-  const title=document.createElement('div');title.className='utitle';title.textContent=sn.title||'Video YouTube';
-  const channel=document.createElement('div');channel.className='desc';channel.textContent=sn.channelTitle||'';
-  const play=document.createElement('button');play.type='button';play.className='buy';play.textContent='▶ Phát';
-  play.addEventListener('click',()=>playVideo(id,sn.title||'Video YouTube'));
-  info.append(title,channel,play);card.append(thumb,info);results.append(card);
- }
- async function search(){
-  const q=queryInput.value.trim(),key=keyInput.value.trim();
-  if(!q){setStatus('Bro nhập tên bài hát cần tìm nhé.');return}
-  if(!key){setStatus('Bro dán YouTube Data API Key vào ô phía trên nhé.');return}
-  $('ytSearchBtn').disabled=true;setStatus('Đang tìm kiếm trên YouTube…');results.replaceChildren();
-  try{
-   const url=new URL('https://www.googleapis.com/youtube/v3/search');
-   url.search=new URLSearchParams({part:'snippet',type:'video',maxResults:'8',q,key}).toString();
-   const response=await fetch(url.toString()),data=await response.json();
-   if(!response.ok)throw new Error(data.error?.message||'Yêu cầu API không thành công.');
-   const items=data.items||[];
-   if(!items.length){setStatus('Không tìm thấy kết quả phù hợp.');return}
-   items.forEach(addResult);setStatus('Có '+items.length+' kết quả. Chọn Phát để nghe.');
-  }catch(e){setStatus('Lỗi tìm kiếm: '+e.message+' — kiểm tra API Key, quota và YouTube Data API v3.')}
-  finally{$('ytSearchBtn').disabled=false}
- }
- $('ytSearchBtn').addEventListener('click',search);
- queryInput.addEventListener('keydown',e=>{if(e.key==='Enter')search()});
- $('ytKeyToggle').addEventListener('click',()=>{keyInput.type=keyInput.type==='password'?'text':'password';$('ytKeyToggle').textContent=keyInput.type==='password'?'👁 Hiện key':'Ẩn key'});
- $('ytClearKey').addEventListener('click',()=>{keyInput.value='';setStatus('Đã xóa API Key khỏi ô nhập.')});
- $('ytPlayBtn').addEventListener('click',()=>{if(player)player.playVideo();else if(selectedVideo)playVideo(selectedVideo.id,selectedVideo.title);else setStatus('Hãy tìm và chọn một video trước.')});
- $('ytPauseBtn').addEventListener('click',()=>{if(player)player.pauseVideo()});
- $('ytStopBtn').addEventListener('click',()=>{if(player)player.stopVideo()});
- $('ytVolume').addEventListener('input',e=>{const v=Number(e.target.value);$('ytVolumeText').textContent=v+'%';if(player)player.setVolume(v)});
+ const LS=localStorage,K='stYtList',KV='stYtVol',KL='stYtLast';
+ const H=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const PRESETS=[{n:'📚 Lofi',t:'v',id:'jfKfPfyJRdk'},{n:'🌃 Dark ambient',t:'v',id:'A_nRzRZQqv0'},{n:'🌌 Synthwave',t:'v',id:'4xDzrJKXOOY'},{n:'🎹 Piano',t:'v',id:'nWjC1RnLYbM'}];
+ const ID11=/^[\w-]{11}$/,IDL=/^[\w-]{10,60}$/;
+ let list=[];try{list=JSON.parse(LS.getItem(K)||'[]').filter(x=>x&&(x.t==='v'&&ID11.test(x.id)||x.t==='l'&&IDL.test(x.id))).slice(0,12)}catch(e){}
+ let player=null,cur=null,state=-1,apiP=null,errRun=0;
+ const setNow=t=>{$('ytNow').textContent=t};
+ const saveList=()=>{try{LS.setItem(K,JSON.stringify(list))}catch(e){}};
+ const vol=()=>{const v=Number($('ytVol').value);return Number.isFinite(v)?Math.max(0,Math.min(100,v)):50};
+ function parse(t){t=String(t||'').trim();if(!t)return null;if(ID11.test(t))return{t:'v',id:t};
+  try{const u=new URL(/^https?:\/\//i.test(t)?t:'https://'+t),h=u.hostname.replace(/^(www|m|music)\./,'');
+   if(!['youtube.com','youtu.be','youtube-nocookie.com'].includes(h))return null;
+   const list=u.searchParams.get('list');let v=u.searchParams.get('v');
+   if(h==='youtu.be')v=u.pathname.split('/').filter(Boolean)[0];
+   else{const p=u.pathname.split('/').filter(Boolean);if(['live','shorts','embed','v'].includes(p[0]))v=p[1]}
+   if(v&&ID11.test(v))return{t:'v',id:v};
+   if(list&&IDL.test(list))return{t:'l',id:list};
+  }catch(e){}
+  return null}
+ const same=(a,b)=>!!a&&!!b&&a.t===b.t&&a.id===b.id;
+ function renderList(){
+  $('ytList').innerHTML=list.length?list.map((x,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #ffffff10"><div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${same(x,cur)?'🎶 ':''}${H(x.title||(x.t==='l'?'Danh sách phát '+x.id:'Video '+x.id))}</div><button class="buy" data-yp="${i}" style="min-width:auto;padding:6px 10px">▶</button><button class="buy" data-yd="${i}" style="min-width:auto;padding:6px 10px">🗑️</button></div>`).join(''):'Chưa có bài nào. Dán link ở trên rồi bấm Phát link này để lưu vào danh sách.';
+  $('ytList').querySelectorAll('[data-yp]').forEach(b=>b.onclick=()=>play(list[+b.dataset.yp]));
+  $('ytList').querySelectorAll('[data-yd]').forEach(b=>b.onclick=()=>{list.splice(+b.dataset.yd,1);saveList();renderList()})}
+ function loadAPI(){if(window.YT&&YT.Player)return Promise.resolve();if(apiP)return apiP;
+  apiP=new Promise((res,rej)=>{const prev=window.onYouTubeIframeAPIReady;window.onYouTubeIframeAPIReady=()=>{try{prev&&prev()}catch(e){}res()};
+   const s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';s.onerror=()=>{apiP=null;rej(new Error('Không tải được YouTube. Kiểm tra mạng.'))};document.head.appendChild(s)});return apiP}
+ function makePlayer(){return new Promise(res=>{$('ytBox').classList.remove('hidden');
+  const vars={playsinline:1,rel:0,modestbranding:1};if(/^https?:$/.test(location.protocol))vars.origin=location.origin;
+  player=new YT.Player('ytPlayer',{width:'100%',height:'200',playerVars:vars,events:{onReady:()=>{try{player.setVolume(vol())}catch(e){}res()},onStateChange:onState,onError:onErr}})})}
+ async function play(item){if(!item)return;cur=item;try{LS.setItem(KL,JSON.stringify(item))}catch(e){}setNow('⏳ Đang tải…');
+  try{await loadAPI();if(!player)await makePlayer()}catch(e){setNow('❌ '+(e.message||e));return}
+  if(item.t==='l'){player.loadPlaylist({list:item.id,listType:'playlist',index:0});setTimeout(()=>{try{player.setLoop(true)}catch(e){}},900)}
+  else player.loadVideoById(item.id);
+  renderList()}
+ function onState(e){state=e.data;const S=YT.PlayerState;
+  if(e.data===S.PLAYING){errRun=0;$('ytPlay').textContent='⏸️ Tạm dừng';
+   try{const d=player.getVideoData();if(d&&d.title){setNow('🎶 '+d.title);const it=list.find(x=>same(x,cur));if(it&&!it.title){it.title=d.title;saveList();renderList()}}}catch(x){}}
+  else if(e.data===S.PAUSED){$('ytPlay').textContent='▶️ Phát'}
+  else if(e.data===S.ENDED&&cur&&cur.t==='v'){if(list.length>1&&list.some(x=>same(x,cur)))step(1);else{try{player.seekTo(0);player.playVideo()}catch(x){}}}}
+ const ERR={2:'Link YouTube không hợp lệ.',5:'Trình phát gặp lỗi, thử lại nhé.',100:'Video không tồn tại hoặc đang ở chế độ riêng tư.',101:'Chủ video không cho phát ngoài YouTube. Hãy chọn video khác.',150:'Chủ video không cho phát ngoài YouTube. Hãy chọn video khác.',153:'YouTube chặn phát vì thiếu nguồn trang (lỗi 153). Hãy mở game bằng Chrome qua link web.'};
+ function onErr(e){setNow('❌ '+(ERR[e.data]||('Không phát được (mã '+e.data+')')));$('ytPlay').textContent='▶️ Phát';
+  if(++errRun<3&&[100,101,150].includes(e.data)&&(list.length>1))setTimeout(()=>step(1),2500)}
+ const seq=()=>list.length?list:PRESETS;
+ function step(d){const L=seq();let i=L.findIndex(x=>same(x,cur));i=i<0?0:(i+d+L.length)%L.length;play(L[i])}
+ $('ytPresets').innerHTML=PRESETS.map((x,i)=>`<button class="wide-btn" data-ps="${i}">${H(x.n)}</button>`).join('');
+ $('ytPresets').querySelectorAll('[data-ps]').forEach(b=>b.onclick=()=>play(PRESETS[+b.dataset.ps]));
+ $('ytAdd').onclick=()=>{const it=parse($('ytLink').value);
+  if(!it){setNow('❌ Link không đúng. Hãy dán link video hoặc playlist YouTube.');return}
+  if(!list.some(x=>same(x,it))){list.unshift(Object.assign({},it));list=list.slice(0,12);saveList()}
+  $('ytLink').value='';play(it)};
+ $('ytLink').addEventListener('keydown',e=>{if(e.key==='Enter')$('ytAdd').click()});
+ $('ytPlay').onclick=()=>{if(!player){let last=null;try{last=JSON.parse(LS.getItem(KL)||'null')}catch(e){}play((last&&(ID11.test(last.id)||IDL.test(last.id))&&last)||seq()[0]);return}
+  try{if(state===YT.PlayerState.PLAYING)player.pauseVideo();else player.playVideo()}catch(e){}};
+ $('ytPrev').onclick=()=>{if(cur&&cur.t==='l'&&player){try{player.previousVideo()}catch(e){}}else step(-1)};
+ $('ytNext').onclick=()=>{if(cur&&cur.t==='l'&&player){try{player.nextVideo()}catch(e){}}else step(1)};
+ {let v=50;try{const x=LS.getItem(KV);if(x!==null)v=Math.max(0,Math.min(100,Number(x)||0))}catch(e){}$('ytVol').value=v;$('ytVolText').textContent=v+'%'}
+ $('ytVol').addEventListener('input',e=>{const v=vol();$('ytVolText').textContent=v+'%';try{LS.setItem(KV,v)}catch(x){}try{player&&player.setVolume(v)}catch(x){}});
+ renderList();
 })();
 /* ===== ONLINE: tạm dừng khi thoát, chợ trao đổi, admin broadcast/ghim/quà ===== */
 (()=>{
@@ -508,19 +509,24 @@ $$('mpType').onchange=fillSub;$$('mpType').onfocus=fillSub;$$('mpSub').onfocus=f
 (async()=>{
 const FB={apiKey:"AIzaSyBCsXWTTDlEPdvLZAme9l6hvEWkin_Vt-w",authDomain:"shadow-tap-abyss-clicker.firebaseapp.com",projectId:"shadow-tap-abyss-clicker",storageBucket:"shadow-tap-abyss-clicker.firebasestorage.app",messagingSenderId:"1012157878985",appId:"1:1012157878985:web:8b276ba670ce6d3704f318"};
 const loadJS=u=>new Promise((r,j)=>{const s=document.createElement('script');s.src=u;s.onload=r;s.onerror=()=>j(new Error('không tải được '+u));document.head.appendChild(s)});
-let db,uid;const to=setTimeout(()=>{if(!uid)st('Không kết nối được Firebase. Kiểm tra mạng, Firestore và Anonymous Auth đã bật chưa.')},12000);
-try{const B='https://www.gstatic.com/firebasejs/10.12.2/';for(const f of['firebase-app-compat.js','firebase-auth-compat.js','firebase-firestore-compat.js'])await loadJS(B+f);
-firebase.initializeApp(FB);uid=(await firebase.auth().signInAnonymously()).user.uid;db=firebase.firestore()}catch(e){clearTimeout(to);st('Lỗi Firebase: '+((e&&e.message)||e));return}
+let db,uid;const to=setTimeout(()=>{if(!uid&&!window.__AUTH.local)st('Không kết nối được Firebase. Kiểm tra mạng, Firestore và Email/Password đã bật chưa.')},12000);
+try{const B='https://www.gstatic.com/firebasejs/10.12.2/';
+if(window.__AUTH.local){clearTimeout(to);st('Chế độ chơi offline: bạn chưa đăng nhập online (chat, chợ, bạn bè tạm tắt). Đăng xuất rồi đăng nhập lại khi có mạng.');return}
+for(const f of['firebase-app-compat.js','firebase-auth-compat.js','firebase-firestore-compat.js']){const have=(f.includes('app')&&window.firebase)||(f.includes('auth')&&window.firebase&&firebase.auth)||(f.includes('firestore')&&window.firebase&&firebase.firestore);if(!have)await loadJS(B+f)}
+if(!firebase.apps.length)firebase.initializeApp(FB);
+const au=firebase.auth();let cu=await new Promise(r=>{const un=au.onAuthStateChanged(x=>{un();r(x)})});
+const ADM='admin@shadowtap.game';
+if(ADMIN){if(!cu||cu.email!==ADM){if(cu&&!cu.isAnonymous)await au.signOut();cu=cu&&cu.isAnonymous?cu:(await au.signInAnonymously()).user}window.__adminFb=!!(cu&&cu.email===ADM)}
+else if(!cu||cu.email!==String(window.__AUTH.user)+'@shadowtap.game'){clearTimeout(to);try{sessionStorage.setItem('stNote','Phiên đăng nhập online đã hết hạn. Hãy đăng nhập lại (mật khẩu giữ nguyên).')}catch(e){}window.__stAuth.logout();return}
+uid=cu.uid;db=firebase.firestore()}catch(e){clearTimeout(to);st('Lỗi Firebase: '+((e&&e.message)||e));return}
 clearTimeout(to);
 const me=uid,name=String(window.__AUTH.name),joined=Date.now();
-const toPid=u=>'a_'+encodeURIComponent(String(u)).replace(/\./g,'%2E');
-const pid=toPid(window.__AUTH.user||name);
+const pid=uid;
 const BAN_IDS=[...new Set([pid,me])],banVals={};
-const FS_RULES="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    function signedIn() { return request.auth != null; }\n\n    // Thiết bị bị cấm (admin ghi bans/{uid thiết bị})\n    function banned() {\n      return exists(/databases/$(database)/documents/bans/$(request.auth.uid))\n        && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time.toMillis();\n    }\n\n    // Danh sách người chơi / online (id = a_tên-tài-khoản)\n    match /players/{id} {\n      allow read: if signedIn();\n      allow write: if signedIn();\n    }\n\n    // Chat: chữ, sticker, ảnh nén\n    match /chat/{id} {\n      allow read: if signedIn();\n      allow create: if signedIn() && !banned()\n        && request.resource.data.uid == request.auth.uid\n        && (!('text' in request.resource.data) || request.resource.data.text.size() <= 300)\n        && (!('image' in request.resource.data) || request.resource.data.image.size() < 250000)\n        && (!('video' in request.resource.data) || request.resource.data.video.size() < 900);\n      allow update, delete: if false;\n    }\n\n    // Chợ: chỉ người bán hủy / nhận tiền; người khác chỉ được mua\n    match /market/{id} {\n      allow read: if signedIn();\n      allow create: if signedIn() && !banned()\n        && request.resource.data.seller == request.auth.uid\n        && request.resource.data.status == 'open';\n      allow update: if signedIn() && (\n        (!banned()\n          && resource.data.status == 'open'\n          && request.resource.data.status == 'sold'\n          && request.resource.data.buyer == request.auth.uid\n          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','buyer','buyerName','soldTs']))\n        ||\n        (resource.data.seller == request.auth.uid\n          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','settled'])\n          && ((resource.data.status == 'open' && request.resource.data.status == 'cancelled')\n              || (resource.data.status == 'sold' && request.resource.data.status == 'sold')))\n      );\n      allow delete: if false;\n    }\n\n    // Bạn bè, nhóm, chat riêng\n    match /friends/{id} { allow read, write: if signedIn(); }\n    match /groups/{id}  { allow read, write: if signedIn(); }\n    match /rooms/{room}/msgs/{id} {\n      allow read: if signedIn();\n      allow create: if signedIn() && !banned()\n        && (!('text' in request.resource.data) || request.resource.data.text.size() <= 300)\n        && (!('image' in request.resource.data) || request.resource.data.image.size() < 250000)\n        && (!('video' in request.resource.data) || request.resource.data.video.size() < 900);\n      allow update, delete: if false;\n    }\n\n    // Khu vực admin (ghi từ app admin)\n    match /gifts/{id}        { allow read, write: if signedIn(); }\n    match /broadcasts/{id}   { allow read, write: if signedIn(); }\n    match /admin/{id}        { allow read, write: if signedIn(); }\n    match /bans/{id}         { allow read, write: if signedIn(); }\n    match /adminActions/{id} { allow read, create: if signedIn(); }\n  }\n}\n";
-const ST_RULES="rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    // Video chat (tối đa 55MB mỗi file, chỉ nhận video)\n    match /videos/{allPaths=**} {\n      allow read: if request.auth != null;\n      allow write: if request.auth != null\n        && request.resource.size < 55 * 1024 * 1024\n        && request.resource.contentType.matches('video/.*');\n    }\n  }\n}\n";
-const devOf=t=>{const p=(window.__stPlayers||[]).find(x=>x.uid===t);return p?(p.dev||(String(t).startsWith('a_')?'':t)):''};
-function resolveTarget(v){v=String(v||'').trim();if(!v)return '';if(v.startsWith('a_'))return v;const q=v.toLowerCase();const hit=(window.__stPlayers||[]).filter(p=>String(p.name||'').toLowerCase()===q).sort((a,b)=>(String(b.uid).startsWith('a_')-String(a.uid).startsWith('a_'))||((b.seen||0)-(a.seen||0)))[0];return hit?hit.uid:toPid(q)}
-const banTargets=t=>{const L=window.__stPlayers||[],p=L.find(x=>x.uid===t),nm=p?String(p.name||'').toLowerCase():'',set=new Set([t]);if(nm)L.forEach(x=>{if(String(x.uid).startsWith('a_')&&String(x.name||'').toLowerCase()===nm&&x.uid!==pid&&x.uid!=='a_admin')set.add(x.uid)});return [...set]};
+const FS_RULES="rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    function signedIn() { return request.auth != null; }\n\n    // Tài khoản admin: tạo trong Firebase → Authentication → Users\n    // (email admin@shadowtap.game, mật khẩu = mật khẩu admin của game)\n    function isAdmin() {\n      return signedIn() && request.auth.token.email == 'admin@shadowtap.game';\n    }\n\n    // Tài khoản bị cấm (bans/{uid})\n    function banned() {\n      return exists(/databases/$(database)/documents/bans/$(request.auth.uid))\n        && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time.toMillis();\n    }\n\n    // Chat riêng: id phòng d_uidA|uidB ; chat nhóm: g_idNhóm\n    function roomMember(room) {\n      return (room.matches('d_.*') && request.auth.uid in room.split('_')[1].split('[|]'))\n        || (room.matches('g_.*')\n            && request.auth.uid in get(/databases/$(database)/documents/groups/$(room.split('_')[1])).data.members);\n    }\n\n    // Người chơi online: mỗi người chỉ ghi được dòng của chính mình\n    match /players/{id} {\n      allow read: if signedIn();\n      allow create, update, delete: if signedIn() && request.auth.uid == id;\n    }\n\n    // Chat chung\n    match /chat/{id} {\n      allow read: if signedIn();\n      allow create: if signedIn() && !banned()\n        && request.resource.data.uid == request.auth.uid\n        && (!('text' in request.resource.data) || request.resource.data.text.size() <= 300)\n        && (!('image' in request.resource.data) || request.resource.data.image.size() < 250000);\n      allow update, delete: if false;\n    }\n\n    // Chợ: chỉ người bán hủy / nhận tiền; người khác chỉ được mua\n    match /market/{id} {\n      allow read: if signedIn();\n      allow create: if signedIn() && !banned()\n        && request.resource.data.seller == request.auth.uid\n        && request.resource.data.status == 'open';\n      allow update: if signedIn() && (\n        (!banned()\n          && resource.data.status == 'open'\n          && request.resource.data.status == 'sold'\n          && request.resource.data.buyer == request.auth.uid\n          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','buyer','buyerName','soldTs']))\n        ||\n        (resource.data.seller == request.auth.uid\n          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','settled'])\n          && ((resource.data.status == 'open' && request.resource.data.status == 'cancelled')\n              || (resource.data.status == 'sold' && request.resource.data.status == 'sold')))\n      );\n      allow delete: if false;\n    }\n\n    // Bạn bè: chỉ 2 người trong cặp mới đọc / sửa được\n    match /friends/{id} {\n      allow get: if signedIn() && (resource == null || request.auth.uid in resource.data.members);\n      allow list: if signedIn() && request.auth.uid in resource.data.members;\n      allow create: if signedIn() && request.auth.uid in request.resource.data.members;\n      allow update, delete: if signedIn() && request.auth.uid in resource.data.members;\n    }\n\n    // Nhóm: chỉ thành viên đọc / sửa; người tạo (hoặc thành viên cuối) mới xóa được\n    match /groups/{id} {\n      allow read: if signedIn() && request.auth.uid in resource.data.members;\n      allow create: if signedIn()\n        && request.resource.data.owner == request.auth.uid\n        && request.auth.uid in request.resource.data.members;\n      allow update: if signedIn() && request.auth.uid in resource.data.members;\n      allow delete: if signedIn() && request.auth.uid in resource.data.members\n        && (resource.data.owner == request.auth.uid || resource.data.members.size() <= 1);\n    }\n\n    // Tin nhắn riêng và nhóm: chỉ thành viên đọc / gửi\n    match /rooms/{room}/msgs/{id} {\n      allow read: if signedIn() && roomMember(room);\n      allow create: if signedIn() && !banned() && roomMember(room)\n        && request.resource.data.from == request.auth.uid\n        && (!('text' in request.resource.data) || request.resource.data.text.size() <= 300)\n        && (!('image' in request.resource.data) || request.resource.data.image.size() < 250000);\n      allow update, delete: if false;\n    }\n\n    // Khu vực admin: chỉ admin ghi, mọi người đã đăng nhập đọc\n    match /gifts/{id}      { allow read: if signedIn(); allow write: if isAdmin(); }\n    match /broadcasts/{id} { allow read: if signedIn(); allow write: if isAdmin(); }\n    match /admin/{id}      { allow read: if signedIn(); allow write: if isAdmin(); }\n    match /bans/{id}       { allow read: if signedIn(); allow write: if isAdmin(); }\n    match /adminActions/{id} { allow read, create: if isAdmin(); }\n  }\n}\n";
+const devOf=t=>'';
+function resolveTarget(v){v=String(v||'').trim();if(!v)return '';const L=window.__stPlayers||[];if(L.some(p=>p.uid===v))return v;const q=v.toLowerCase(),hit=L.filter(p=>String(p.name||'').toLowerCase()===q).sort((a,b)=>(b.seen||0)-(a.seen||0))[0];return hit?hit.uid:''}
+const banTargets=t=>[t];
 let banUntil=0;const banOf=b=>(b&&!ADMIN)?(Number(b.until)||Number(b.expiresAt)||0):0;
 async function checkBan(){for(const id of BAN_IDS){try{const x=await db.doc('bans/'+id).get();banVals[id]=banOf(x.exists?x.data():null)}catch(e){}}banUntil=Math.max(0,...Object.values(banVals));return banUntil>Date.now()}
 async function banBlock(){const b=banUntil>Date.now()||await checkBan();if(b)toast('⛔ Bạn đang bị cấm: không thể chat, đăng bán, mua hay nhận quà');return b}
@@ -530,11 +536,11 @@ window.__ST={db,me,pid,name,banBlock,ADMIN};
  o.innerHTML='<div><div style="font-size:48px">⛔</div><h2>Tài khoản đã bị cấm</h2><p>Hết hạn: '+new Date(banUntil).toLocaleString()+'</p></div>'};
  BAN_IDS.forEach(id=>db.doc('bans/'+id).onSnapshot(x=>showBan(id,x.exists?x.data():null),()=>{}));
  setInterval(()=>BAN_IDS.forEach(id=>db.doc('bans/'+id).get().then(x=>showBan(id,x.exists?x.data():null)).catch(()=>{})),60000)}
-st('🟢 Đã kết nối · bạn là '+name+(ADMIN?' (Admin) · ID: '+pid:''));
+st('🟢 Đã kết nối · bạn là '+name+(ADMIN?' (Admin) · ID: '+pid+(window.__adminFb?'':' ⚠️ chưa có tài khoản Firebase admin@shadowtap.game'):''));
 const err=e=>toast('Lỗi online: '+((e&&e.message)||'bị từ chối quyền ghi'));
 /* online */
-let legacyPresence=false;const hb=()=>{if(window.__stPaused||document.hidden)return;const legacy=()=>{legacyPresence=true;db.doc('players/'+me).set({name,seen:Date.now()}).catch(()=>{})};if(legacyPresence)legacy();else db.doc('players/'+pid).set({name,dev:me,seen:Date.now()}).catch(legacy)};hb();SI(hb,25000);
-db.collection('players').onSnapshot(s=>{const devs=new Set(s.docs.filter(d=>d.id.startsWith('a_')).map(d=>d.data().dev));const aN=new Set(s.docs.filter(d=>d.id.startsWith('a_')).map(d=>String(d.data().name||'').toLowerCase()));const pd=s.docs.filter(d=>d.id.startsWith('a_')||(!devs.has(d.id)&&!aN.has(String(d.data().name||'').toLowerCase())));window.__stPlayers=pd.map(d=>Object.assign({},d.data(),{uid:d.id}));if(window.__stRenderSearch)window.__stRenderSearch();const n=Date.now(),l=pd.map(d=>d.data()).filter(d=>d&&n-d.seen<70000).map(d=>esc(d.name));$$('mpOnline').innerHTML='🟢 Đang online ('+l.length+'): '+l.join(', ')},()=>{});
+const hb=()=>{if(!window.__stPaused&&!document.hidden)db.doc('players/'+pid).set({name,dev:me,v:2,seen:Date.now()}).catch(()=>{})};hb();SI(hb,25000);
+db.collection('players').onSnapshot(s=>{const pd=s.docs.filter(d=>d.data().v===2);window.__stPlayers=pd.map(d=>Object.assign({},d.data(),{uid:d.id}));if(window.__stRenderSearch)window.__stRenderSearch();const n=Date.now(),l=pd.map(d=>d.data()).filter(d=>d&&n-d.seen<70000).map(d=>esc(d.name));$$('mpOnline').innerHTML='🟢 Đang online ('+l.length+'): '+l.join(', ')},()=>{});
 /* ghim + tin nhắn */
 db.doc('admin/pinned').onSnapshot(s=>{const d=s.exists&&s.data();pin.classList.toggle('hidden',!(d&&d.text));if(d&&d.text)pin.innerHTML='📌 <b>Ghim từ Admin:</b> '+esc(d.text)},()=>{});
 db.collection('broadcasts').orderBy('ts','desc').limit(20).onSnapshot(s=>{
@@ -704,7 +710,6 @@ if(ADMIN){
  <div class="mpgrid"><input id="stBanDays" class="field" type="number" min="1" max="3650" placeholder="Cấm trong bao nhiêu ngày"><button id="stBanBtn" class="wide-btn">⛔ Cấm</button></div>
  <button id="stUnbanBtn" class="wide-btn">✅ Gỡ cấm theo UID</button>
  <button id="stRulesBtn" class="wide-btn">📋 Copy Firestore Rules</button>
- <button id="stStRulesBtn" class="wide-btn">📋 Copy Storage Rules (video)</button>
  <div class="mpgrid"><select id="stStatKey" class="mpsel"><option value="money">Linh hồn</option><option value="kc">Kim cương KC</option><option value="vc">Tiền Ảo</option><option value="crystals">Tinh thể</option><option value="vipSouls">Linh Hồn VIP</option></select><input id="stStatValue" class="field" placeholder="Giá trị mới"></div>
  <button id="stStatBtn" class="wide-btn">✏️ Gửi yêu cầu chỉnh chỉ số</button>
  <div id="stAdminResult" class="small" style="margin-top:8px"></div>`;
@@ -735,14 +740,13 @@ if(ADMIN){
  $$('stBanBtn').onclick=async()=>{
   const target=resolveTarget($$('stTargetUid').value),days=Math.floor(Number($$('stBanDays').value));
   if(!target||!Number.isFinite(days)||days<1||days>3650)return toast('Nhập ID/tên và số ngày từ 1 đến 3650');
-   if(target===pid||target==='a_admin')return toast('Không thể cấm tài khoản Admin');
+   if(target===pid||String(((window.__stPlayers||[]).find(p=>p.uid===target)||{}).name||'').toLowerCase()==='admin')return toast('Không thể cấm tài khoản Admin');
   try{const until=Date.now()+days*86400000;let direct=false;
    try{for(const t of banTargets(target)){await db.doc('bans/'+t).set({until,by:me,ts:Date.now()});const dv=devOf(t);if(dv&&dv!==me)db.doc('bans/'+dv).set({until,by:me,ts:Date.now()}).catch(()=>{})}direct=true}catch(e){}
    let reqOk=false;try{await db.collection('adminActions').add({type:'ban',targetUid:target,days,expiresAt:until,by:me,createdAt:Date.now(),status:'pending'});reqOk=true}catch(e){}
    result.textContent=direct?'Đã cấm ngay ID: '+banTargets(target).join(', ')+'. Người này không chat, đăng bán, mua, nhận quà được (khi họ đang mở bản mới).':(reqOk?'Rules chặn ghi trực tiếp — đã gửi yêu cầu cấm, cần Cloud Function áp dụng.':'❌ Firestore Rules đang chặn. Bấm "📋 Copy Firestore Rules", dán vào Firebase Console → Firestore → Rules → Publish rồi cấm lại.')}
   catch(e){err(e)}
  };
- $$('stStRulesBtn').onclick=async()=>{try{await navigator.clipboard.writeText(ST_RULES);toast('Đã copy Storage Rules — dán vào Firebase Console → Storage → Rules')}catch(e){result.textContent='Không copy được. Mở file storage.rules.'}};
  $$('stRulesBtn').onclick=async()=>{try{await navigator.clipboard.writeText(FS_RULES);toast('Đã copy Rules — dán vào Firebase Console → Firestore → Rules')}catch(e){result.textContent='Không copy được. Mở file firestore.rules để lấy nội dung.'}};
  $$('stUnbanBtn').onclick=async()=>{const target=resolveTarget($$('stTargetUid').value);if(!target)return toast('Nhập UID');try{for(const t of banTargets(target)){await db.doc('bans/'+t).delete();const dv=devOf(t);if(dv&&dv!==me)db.doc('bans/'+dv).delete().catch(()=>{})}result.textContent='Đã gỡ cấm.'}catch(e){result.textContent='❌ Không gỡ được (Rules chặn). Dùng nút Copy Firestore Rules.'}};
  $$('stStatBtn').onclick=async()=>{
