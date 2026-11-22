@@ -99,6 +99,16 @@ try{const f=await sdk();
 <p>Dán link video hoặc danh sách phát YouTube để nghe nhạc ngay trong game. Bấm Phát một lần để trình duyệt cho phép âm thanh.</p>
 <input class="field" id="ytLink" type="text" inputmode="url" placeholder="Dán link YouTube (video hoặc playlist)" autocomplete="off">
 <button class="wide-btn" id="ytAdd">▶️ Phát link này</button>
+<div class="music-label">🔑 API key YouTube (để tìm nhạc)</div>
+<input class="field" id="ytKey" type="password" placeholder="Dán API key (bắt đầu bằng AIza…)" autocomplete="off" spellcheck="false">
+<div class="music-controls"><button class="wide-btn" id="ytKeySave">💾 Lưu key</button><button class="wide-btn" id="ytKeyDel">🗑️ Xóa key</button></div>
+<div class="small" id="ytKeySt" aria-live="polite"></div>
+<a class="wide-btn" id="ytGuide" href="huong-dan-lay-key.html" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box">📖 Hướng dẫn lấy API key YouTube</a>
+<div class="music-label">🔍 Tìm nhạc trên YouTube</div>
+<input class="field" id="ytQ" type="text" placeholder="Gõ tên bài hát hoặc ca sĩ…" autocomplete="off">
+<button class="wide-btn" id="ytSBtn">🔍 Tìm</button>
+<div class="small" id="ytSStat" aria-live="polite"></div>
+<div id="ytSRes"></div>
 <div class="music-label">✨ Gợi ý nhanh</div>
 <div class="music-controls" id="ytPresets"></div>
 <div class="music-now" id="ytNow">Chưa chọn bài. Dán link hoặc bấm một gợi ý.</div>
@@ -439,6 +449,52 @@ setInterval(save,3000);document.addEventListener('visibilitychange',()=>{if(docu
  $('ytNext').onclick=()=>{if(cur&&cur.t==='l'&&player){try{player.nextVideo()}catch(e){}}else step(1)};
  {let v=50;try{const x=LS.getItem(KV);if(x!==null)v=Math.max(0,Math.min(100,Number(x)||0))}catch(e){}$('ytVol').value=v;$('ytVolText').textContent=v+'%'}
  $('ytVol').addEventListener('input',e=>{const v=vol();$('ytVolText').textContent=v+'%';try{LS.setItem(KV,v)}catch(x){}try{player&&player.setVolume(v)}catch(x){}});
+ /* Tìm nhạc bằng YouTube Data API v3: mỗi người chơi tự dán key của mình (lưu ở localStorage). Mỗi lượt tìm tốn 100/10.000 điểm mỗi ngày. */
+ const KK='stYtKey',KEYRE=/^AIza[\w-]{30,45}$/;
+ let YT_API_KEY='';try{YT_API_KEY=LS.getItem(KK)||''}catch(e){}
+ const keyMsg=()=>{$('ytKeySt').textContent=YT_API_KEY?'✅ Đã lưu key (…'+YT_API_KEY.slice(-4)+'). Key chỉ lưu trên máy này.':'Chưa có key. Bấm "Hướng dẫn lấy API key" bên dưới để lấy key miễn phí.'};
+ $('ytKeySave').onclick=()=>{const v=$('ytKey').value.trim();
+  if(!KEYRE.test(v)){$('ytKeySt').textContent='❌ Key chưa đúng. Key YouTube bắt đầu bằng AIza và dài khoảng 39 ký tự.';return}
+  YT_API_KEY=v;try{LS.setItem(KK,v)}catch(e){}$('ytKey').value='';keyMsg()};
+ $('ytKeyDel').onclick=()=>{YT_API_KEY='';try{LS.removeItem(KK)}catch(e){}$('ytKey').value='';sc={};try{LS.removeItem(SC)}catch(e){}keyMsg()};
+ const SC='stYtSearchCache',SCTTL=6*3600e3;
+ let sc={};try{sc=JSON.parse(LS.getItem(SC)||'{}')}catch(e){}
+ const decH=t=>{const x=document.createElement('textarea');x.innerHTML=String(t||'');return x.value};
+ function showRes(items){
+  const box=$('ytSRes');box.innerHTML='';
+  if(!items.length){box.textContent='Không tìm thấy bài nào.';return}
+  items.forEach(it=>{
+   const r=document.createElement('div');r.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #ffffff10';
+   if(it.th){const im=document.createElement('img');im.src=it.th;im.alt='';im.style.cssText='width:56px;height:42px;object-fit:cover;border-radius:6px;flex:none';r.appendChild(im)}
+   const d=document.createElement('div');d.style.cssText='flex:1;min-width:0';
+   const t=document.createElement('div');t.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';t.textContent=it.title;
+   const c=document.createElement('div');c.className='small';c.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';c.textContent=it.by;
+   d.appendChild(t);d.appendChild(c);r.appendChild(d);
+   const p=document.createElement('button');p.className='buy';p.style.cssText='min-width:auto;padding:6px 10px';p.textContent='▶';p.setAttribute('aria-label','Phát '+it.title);
+   p.onclick=()=>play({t:'v',id:it.id,title:it.title});
+   const ad=document.createElement('button');ad.className='buy';ad.style.cssText='min-width:auto;padding:6px 10px';ad.textContent='＋';ad.setAttribute('aria-label','Thêm vào danh sách');
+   ad.onclick=()=>{if(!list.some(x=>same(x,{t:'v',id:it.id}))){list.unshift({t:'v',id:it.id,title:it.title});list=list.slice(0,12);saveList();renderList()}ad.textContent='✓'};
+   r.appendChild(p);r.appendChild(ad);box.appendChild(r)})}
+ async function ytSearch(){
+  const q=$('ytQ').value.trim(),st=$('ytSStat');if(!q)return;
+  if(!YT_API_KEY){st.textContent='🔑 Chưa có API key. Dán key vào ô phía trên (bấm "Hướng dẫn lấy API key" nếu chưa có).';return}
+  const key=q.toLowerCase(),hit=sc[key];
+  if(hit&&Date.now()-hit.t<SCTTL){st.textContent='';showRes(hit.r);return}
+  st.textContent='⏳ Đang tìm…';$('ytSRes').innerHTML='';
+  try{
+   const r=await fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=8&q='+encodeURIComponent(q)+'&key='+encodeURIComponent(YT_API_KEY));
+   const j=await r.json();
+   if(!r.ok){const m=(j.error&&j.error.message)||'lỗi không rõ';st.textContent='❌ '+(/quota/i.test(m)?'Key này đã hết lượt tìm hôm nay, ngày mai thử lại nhé.':/not valid|invalid/i.test(m)?'Key không hợp lệ. Hãy kiểm tra lại hoặc lấy key mới.':/referer|referrer|blocked/i.test(m)?'Key đang bị chặn theo tên miền. Vào Google Cloud, thêm địa chỉ game vào mục Sites Web của key.':/has not been used|disabled/i.test(m)?'Chưa bật YouTube Data API v3 cho project của key này.':m);return}
+   const res=(j.items||[]).filter(v=>v.id&&ID11.test(v.id.videoId||'')).map(v=>{const th=v.snippet.thumbnails&&v.snippet.thumbnails.default&&v.snippet.thumbnails.default.url;
+    return{id:v.id.videoId,title:decH(v.snippet.title),by:decH(v.snippet.channelTitle),th:/^https:\/\/i\.ytimg\.com\//.test(th||'')?th:''}});
+   sc[key]={t:Date.now(),r:res};
+   const ks=Object.keys(sc);if(ks.length>30){ks.sort((x,y)=>sc[x].t-sc[y].t).slice(0,ks.length-30).forEach(k=>delete sc[k])}
+   try{LS.setItem(SC,JSON.stringify(sc))}catch(e){}
+   st.textContent='';showRes(res)
+  }catch(e){st.textContent='❌ Không kết nối được. Kiểm tra mạng.'}}
+ $('ytSBtn').onclick=ytSearch;
+ $('ytQ').addEventListener('keydown',e=>{if(e.key==='Enter')ytSearch()});
+ keyMsg();
  renderList();
 })();
 /* ===== ONLINE: tạm dừng khi thoát, chợ trao đổi, admin broadcast/ghim/quà ===== */

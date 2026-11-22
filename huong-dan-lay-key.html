@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Hướng dẫn lấy API key YouTube</title>
+<style>
+:root{--bg:#0d0a1a;--sf:#17122b;--bd:#2c2450;--tx:#ece8ff;--mu:#a69fcf;--ac:#a78bfa;--acx:#150f2e;--ok:#4ade80;--warn:#fbbf24;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root{--bg:#f6f4ff;--sf:#fff;--bd:#d9d3f2;--tx:#1d1740;--mu:#5d5689;--ac:#6d4de0;--acx:#fff;--ok:#15803d;--warn:#b45309}}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.65 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:1.45rem;margin:8px 0 4px}
+.sub{color:var(--mu);margin:0 0 14px}
+.back,.btn{display:inline-block;text-decoration:none;border-radius:10px;padding:10px 14px;font-weight:600}
+.back{color:var(--tx);border:1px solid var(--bd);background:var(--sf);margin-bottom:12px}
+.btn{background:var(--ac);color:var(--acx);margin:6px 8px 6px 0}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;margin:12px 0}
+.card h2{margin:0 0 6px;font-size:1.1rem;display:flex;gap:10px;align-items:center}
+.num{flex:none;width:28px;height:28px;border-radius:50%;background:var(--ac);color:var(--acx);display:grid;place-items:center;font-weight:800;font-size:.95rem}
+.card p{margin:6px 0}
+.card ul{margin:6px 0;padding-left:20px}
+code{background:#00000033;border-radius:6px;padding:1px 6px;font-size:.92em;word-break:break-all}
+.note{border-left:4px solid var(--warn);padding:8px 12px;margin:10px 0;background:#fbbf2414;border-radius:0 8px 8px 0}
+.ok{border-left:4px solid var(--ok);padding:8px 12px;margin:10px 0;background:#4ade8014;border-radius:0 8px 8px 0}
+table{width:100%;border-collapse:collapse;font-size:.92rem;display:block;overflow-x:auto}
+th,td{border:1px solid var(--bd);padding:6px 8px;text-align:left;white-space:nowrap}
+th{background:#a78bfa22}
+a{color:var(--ac)}
+a:focus-visible,.btn:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+details{margin-top:8px}
+summary{cursor:pointer;font-weight:600}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="index.html">← Quay lại game</a>
+<h1>🔑 Cách lấy API key YouTube (miễn phí)</h1>
+<p class="sub">Key này dùng cho ô <b>Tìm nhạc trên YouTube</b> trong game. Làm một lần, mất khoảng 5 phút. Không cần thẻ thanh toán.</p>
+
+<div class="ok"><b>Key là gì?</b> Là một chuỗi bắt đầu bằng <code>AIza</code> dài khoảng 39 ký tự. Google cho mỗi tài khoản <b>10.000 điểm miễn phí mỗi ngày</b>. Mỗi lần tìm nhạc tốn 100 điểm, tức khoảng <b>100 lượt tìm mỗi ngày</b>. Nghe nhạc không tốn điểm.</div>
+
+<section class="card">
+<h2><span class="num">1</span> Đăng nhập Google Cloud</h2>
+<p>Mở trang bên dưới và đăng nhập bằng tài khoản Google của bạn.</p>
+<a class="btn" href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer">Mở Google Cloud</a>
+<div class="note">Nếu Google báo <b>"Accès à Google Cloud bloqué"</b> hoặc yêu cầu bật <b>xác minh 2 bước (MFA)</b>, hãy bấm nút <b>Activer la MFA / Enable MFA</b>, làm theo hướng dẫn (thường nhập số điện thoại và mã SMS), rồi tải lại trang. Có thể mất vài phút.</div>
+<p>Nếu có thanh quảng cáo <b>"Commencez l'essai gratuit"</b>, bạn cứ bấm <b>Fermer / Close</b>. Bạn không cần dùng bản dùng thử.</p>
+</section>
+
+<section class="card">
+<h2><span class="num">2</span> Chọn hoặc tạo project</h2>
+<p>Ở thanh trên cùng, bấm tên project hiện tại (hoặc "Select a project"). Chọn một project có sẵn, hoặc bấm <b>New project / Nouveau projet</b>, đặt tên bất kỳ (ví dụ <code>game-nhac</code>) rồi bấm <b>Create / Créer</b>.</p>
+</section>
+
+<section class="card">
+<h2><span class="num">3</span> Bật YouTube Data API v3</h2>
+<p>Mở trang bên dưới, kiểm tra project ở thanh trên là project vừa chọn, rồi bấm nút xanh <b>Enable / Activer</b>.</p>
+<a class="btn" href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener noreferrer">Mở trang YouTube Data API v3</a>
+<p>Nếu link không mở đúng, vào menu ☰ → <b>APIs &amp; Services</b> → <b>Library</b>, gõ <code>YouTube Data API v3</code> để tìm.</p>
+</section>
+
+<section class="card">
+<h2><span class="num">4</span> Tạo API key</h2>
+<p>Mở trang bên dưới, bấm <b>Create credentials / Créer des identifiants</b> rồi chọn <b>API key / Clé API</b>.</p>
+<a class="btn" href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Mở trang Credentials</a>
+<p>Nếu Google hiện màn hình hỏi bạn muốn truy cập dữ liệu nào:</p>
+<ul>
+<li>Ở ô <b>Select an API</b> chọn <b>YouTube Data API v3</b>.</li>
+<li>Chọn <b>Public data / Données publiques</b> (mô tả có ghi sẽ tạo một API key). <b>Đừng</b> chọn User data vì nó tạo OAuth, không phải key.</li>
+<li>Bấm <b>Next / Suivant</b>, Google sẽ hiện key. Bấm biểu tượng sao chép để lấy key.</li>
+</ul>
+</section>
+
+<section class="card">
+<h2><span class="num">5</span> Hạn chế key (nên làm)</h2>
+<p>Vì key nằm trong trình duyệt của bạn, hãy khóa nó lại để người khác lấy được cũng không dùng được. Trong danh sách API keys, bấm vào tên key vừa tạo, rồi:</p>
+<ul>
+<li><b>Application restrictions</b> (Restrictions relatives aux applications) → chọn <b>Websites / Sites Web</b> → bấm <b>Add / Ajouter</b> → nhập địa chỉ nơi bạn mở game, ví dụ <code>https://ten-ban.github.io/*</code>.</li>
+<li><b>API restrictions</b> (Restrictions relatives aux API) → chọn <b>Restrict key / Restreindre la clé</b> → tick <b>YouTube Data API v3</b>.</li>
+<li>Bấm <b>Save / Enregistrer</b>.</li>
+</ul>
+<div class="note">Key sau khi lưu cần vài phút mới có hiệu lực. Nếu bạn mở game trực tiếp từ file trên máy (không qua link web) thì key đã hạn chế theo trang web sẽ bị chặn. Khi đó hãy mở game qua link web.</div>
+</section>
+
+<section class="card">
+<h2><span class="num">6</span> Dán key vào game</h2>
+<p>Quay lại game, mở thẻ <b>🎵 Nhạc YouTube</b>, dán key vào ô <b>API key YouTube</b> rồi bấm <b>💾 Lưu key</b>. Khi thấy dòng <b>✅ Đã lưu key</b> là xong. Giờ bạn có thể gõ tên bài vào ô <b>Tìm nhạc trên YouTube</b>.</p>
+<p>Key chỉ được lưu trên máy của bạn. Bấm <b>🗑️ Xóa key</b> nếu muốn gỡ.</p>
+<a class="btn" href="index.html">← Quay lại game</a>
+</section>
+
+<section class="card">
+<h2>❓ Gặp lỗi?</h2>
+<table>
+<tr><th>Thông báo trong game</th><th>Cách xử lý</th></tr>
+<tr><td>Key không hợp lệ</td><td>Dán lại key, kiểm tra không thừa khoảng trắng.</td></tr>
+<tr><td>Key đang bị chặn theo tên miền</td><td>Bước 5: thêm đúng địa chỉ game vào Websites, đợi vài phút.</td></tr>
+<tr><td>Chưa bật YouTube Data API v3</td><td>Làm lại bước 3 trong đúng project của key.</td></tr>
+<tr><td>Key này đã hết lượt tìm hôm nay</td><td>Đợi sang ngày mai (hạn mức làm mới khoảng 14 giờ chiều giờ Việt Nam).</td></tr>
+</table>
+<details>
+<summary>Tên các mục theo ngôn ngữ</summary>
+<table>
+<tr><th>Tiếng Anh</th><th>Tiếng Pháp</th></tr>
+<tr><td>Credentials</td><td>Identifiants</td></tr>
+<tr><td>Create credentials</td><td>Créer des identifiants</td></tr>
+<tr><td>API key</td><td>Clé API</td></tr>
+<tr><td>Enable</td><td>Activer</td></tr>
+<tr><td>Websites</td><td>Sites Web</td></tr>
+<tr><td>Restrict key</td><td>Restreindre la clé</td></tr>
+<tr><td>Save</td><td>Enregistrer</td></tr>
+</table>
+</details>
+<p>Đừng chia sẻ key của bạn công khai (đăng lên mạng xã hội, gửi cho người lạ). Nếu lỡ lộ, vào trang Credentials, xóa key và tạo key mới.</p>
+</section>
+
+<a class="back" href="index.html">← Quay lại game</a>
+</main>
+</body>
+</html>
