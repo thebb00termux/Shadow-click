@@ -99,16 +99,6 @@ try{const f=await sdk();
 <p>Dán link video hoặc danh sách phát YouTube để nghe nhạc ngay trong game. Bấm Phát một lần để trình duyệt cho phép âm thanh.</p>
 <input class="field" id="ytLink" type="text" inputmode="url" placeholder="Dán link YouTube (video hoặc playlist)" autocomplete="off">
 <button class="wide-btn" id="ytAdd">▶️ Phát link này</button>
-<div class="music-label">🔑 API key YouTube (để tìm nhạc)</div>
-<input class="field" id="ytKey" type="password" placeholder="Dán API key (bắt đầu bằng AIza…)" autocomplete="off" spellcheck="false">
-<div class="music-controls"><button class="wide-btn" id="ytKeySave">💾 Lưu key</button><button class="wide-btn" id="ytKeyDel">🗑️ Xóa key</button></div>
-<div class="small" id="ytKeySt" aria-live="polite"></div>
-<a class="wide-btn" id="ytGuide" href="huong-dan-lay-key.html" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box">📖 Hướng dẫn lấy API key YouTube</a>
-<div class="music-label">🔍 Tìm nhạc trên YouTube</div>
-<input class="field" id="ytQ" type="text" placeholder="Gõ tên bài hát hoặc ca sĩ…" autocomplete="off">
-<button class="wide-btn" id="ytSBtn">🔍 Tìm</button>
-<div class="small" id="ytSStat" aria-live="polite"></div>
-<div id="ytSRes"></div>
 <div class="music-label">✨ Gợi ý nhanh</div>
 <div class="music-controls" id="ytPresets"></div>
 <div class="music-now" id="ytNow">Chưa chọn bài. Dán link hoặc bấm một gợi ý.</div>
@@ -117,6 +107,7 @@ try{const f=await sdk();
 <label class="music-label" for="ytVol">🔊 Âm lượng: <span id="ytVolText">50%</span></label><input id="ytVol" class="volume-slider" type="range" min="0" max="100" value="50">
 <div class="music-label">📚 Danh sách của bạn</div><div id="ytList" class="small"></div>
 <div class="small">Nhạc phát trực tiếp từ YouTube nên cần có mạng. Game không lưu hay tải nhạc về.</div></div>
+<div class="extra-card"><h2>📺 Xem video TikTok</h2><p>Dán link video TikTok để xem ngay trong game. Link TikTok gửi trong chat cũng bấm xem được.</p><input class="field" id="ttLink" type="text" inputmode="url" placeholder="Dán link TikTok (dạng tiktok.com/@ten/video/số)" autocomplete="off"><button class="wide-btn" id="ttGo">▶️ Xem video</button><div class="small" id="ttMsg"></div></div>
 <div class="extra-card"><h2>💾 Dữ liệu & âm thanh</h2><p>Sao lưu tiến trình để chuyển máy. Nhạc nền và hiệu ứng âm thanh được điều khiển riêng.</p><button class="wide-btn" id="exportBtn">📤 Xuất mã lưu</button><textarea id="saveCode" class="field" rows="3" placeholder="Mã sao lưu sẽ hiện ở đây"></textarea><button class="wide-btn" id="importBtn">📥 Nhập mã lưu</button><button class="wide-btn" id="sfxBtn">🔔 Hiệu ứng: Bật</button></div>
 </section>
 
@@ -449,52 +440,6 @@ setInterval(save,3000);document.addEventListener('visibilitychange',()=>{if(docu
  $('ytNext').onclick=()=>{if(cur&&cur.t==='l'&&player){try{player.nextVideo()}catch(e){}}else step(1)};
  {let v=50;try{const x=LS.getItem(KV);if(x!==null)v=Math.max(0,Math.min(100,Number(x)||0))}catch(e){}$('ytVol').value=v;$('ytVolText').textContent=v+'%'}
  $('ytVol').addEventListener('input',e=>{const v=vol();$('ytVolText').textContent=v+'%';try{LS.setItem(KV,v)}catch(x){}try{player&&player.setVolume(v)}catch(x){}});
- /* Tìm nhạc bằng YouTube Data API v3: mỗi người chơi tự dán key của mình (lưu ở localStorage). Mỗi lượt tìm tốn 100/10.000 điểm mỗi ngày. */
- const KK='stYtKey',KEYRE=/^AIza[\w-]{30,45}$/;
- let YT_API_KEY='';try{YT_API_KEY=LS.getItem(KK)||''}catch(e){}
- const keyMsg=()=>{$('ytKeySt').textContent=YT_API_KEY?'✅ Đã lưu key (…'+YT_API_KEY.slice(-4)+'). Key chỉ lưu trên máy này.':'Chưa có key. Bấm "Hướng dẫn lấy API key" bên dưới để lấy key miễn phí.'};
- $('ytKeySave').onclick=()=>{const v=$('ytKey').value.trim();
-  if(!KEYRE.test(v)){$('ytKeySt').textContent='❌ Key chưa đúng. Key YouTube bắt đầu bằng AIza và dài khoảng 39 ký tự.';return}
-  YT_API_KEY=v;try{LS.setItem(KK,v)}catch(e){}$('ytKey').value='';keyMsg()};
- $('ytKeyDel').onclick=()=>{YT_API_KEY='';try{LS.removeItem(KK)}catch(e){}$('ytKey').value='';sc={};try{LS.removeItem(SC)}catch(e){}keyMsg()};
- const SC='stYtSearchCache',SCTTL=6*3600e3;
- let sc={};try{sc=JSON.parse(LS.getItem(SC)||'{}')}catch(e){}
- const decH=t=>{const x=document.createElement('textarea');x.innerHTML=String(t||'');return x.value};
- function showRes(items){
-  const box=$('ytSRes');box.innerHTML='';
-  if(!items.length){box.textContent='Không tìm thấy bài nào.';return}
-  items.forEach(it=>{
-   const r=document.createElement('div');r.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #ffffff10';
-   if(it.th){const im=document.createElement('img');im.src=it.th;im.alt='';im.style.cssText='width:56px;height:42px;object-fit:cover;border-radius:6px;flex:none';r.appendChild(im)}
-   const d=document.createElement('div');d.style.cssText='flex:1;min-width:0';
-   const t=document.createElement('div');t.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';t.textContent=it.title;
-   const c=document.createElement('div');c.className='small';c.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';c.textContent=it.by;
-   d.appendChild(t);d.appendChild(c);r.appendChild(d);
-   const p=document.createElement('button');p.className='buy';p.style.cssText='min-width:auto;padding:6px 10px';p.textContent='▶';p.setAttribute('aria-label','Phát '+it.title);
-   p.onclick=()=>play({t:'v',id:it.id,title:it.title});
-   const ad=document.createElement('button');ad.className='buy';ad.style.cssText='min-width:auto;padding:6px 10px';ad.textContent='＋';ad.setAttribute('aria-label','Thêm vào danh sách');
-   ad.onclick=()=>{if(!list.some(x=>same(x,{t:'v',id:it.id}))){list.unshift({t:'v',id:it.id,title:it.title});list=list.slice(0,12);saveList();renderList()}ad.textContent='✓'};
-   r.appendChild(p);r.appendChild(ad);box.appendChild(r)})}
- async function ytSearch(){
-  const q=$('ytQ').value.trim(),st=$('ytSStat');if(!q)return;
-  if(!YT_API_KEY){st.textContent='🔑 Chưa có API key. Dán key vào ô phía trên (bấm "Hướng dẫn lấy API key" nếu chưa có).';return}
-  const key=q.toLowerCase(),hit=sc[key];
-  if(hit&&Date.now()-hit.t<SCTTL){st.textContent='';showRes(hit.r);return}
-  st.textContent='⏳ Đang tìm…';$('ytSRes').innerHTML='';
-  try{
-   const r=await fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=8&q='+encodeURIComponent(q)+'&key='+encodeURIComponent(YT_API_KEY));
-   const j=await r.json();
-   if(!r.ok){const m=(j.error&&j.error.message)||'lỗi không rõ';st.textContent='❌ '+(/quota/i.test(m)?'Key này đã hết lượt tìm hôm nay, ngày mai thử lại nhé.':/not valid|invalid/i.test(m)?'Key không hợp lệ. Hãy kiểm tra lại hoặc lấy key mới.':/referer|referrer|blocked/i.test(m)?'Key đang bị chặn theo tên miền. Vào Google Cloud, thêm địa chỉ game vào mục Sites Web của key.':/has not been used|disabled/i.test(m)?'Chưa bật YouTube Data API v3 cho project của key này.':m);return}
-   const res=(j.items||[]).filter(v=>v.id&&ID11.test(v.id.videoId||'')).map(v=>{const th=v.snippet.thumbnails&&v.snippet.thumbnails.default&&v.snippet.thumbnails.default.url;
-    return{id:v.id.videoId,title:decH(v.snippet.title),by:decH(v.snippet.channelTitle),th:/^https:\/\/i\.ytimg\.com\//.test(th||'')?th:''}});
-   sc[key]={t:Date.now(),r:res};
-   const ks=Object.keys(sc);if(ks.length>30){ks.sort((x,y)=>sc[x].t-sc[y].t).slice(0,ks.length-30).forEach(k=>delete sc[k])}
-   try{LS.setItem(SC,JSON.stringify(sc))}catch(e){}
-   st.textContent='';showRes(res)
-  }catch(e){st.textContent='❌ Không kết nối được. Kiểm tra mạng.'}}
- $('ytSBtn').onclick=ytSearch;
- $('ytQ').addEventListener('keydown',e=>{if(e.key==='Enter')ytSearch()});
- keyMsg();
  renderList();
 })();
 /* ===== ONLINE: tạm dừng khi thoát, chợ trao đổi, admin broadcast/ghim/quà ===== */
@@ -595,7 +540,7 @@ window.__ST={db,me,pid,name,banBlock,ADMIN};
 st('🟢 Đã kết nối · bạn là '+name+(ADMIN?' (Admin) · ID: '+pid+(window.__adminFb?'':' ⚠️ chưa có tài khoản Firebase admin@shadowtap.game'):''));
 const err=e=>toast('Lỗi online: '+((e&&e.message)||'bị từ chối quyền ghi'));
 /* online */
-const hb=()=>{if(!window.__stPaused&&!document.hidden)db.doc('players/'+pid).set({name,dev:me,v:2,seen:Date.now()}).catch(()=>{})};hb();SI(hb,25000);
+const hb=()=>{if(!window.__stPaused&&!document.hidden)db.doc('players/'+pid).set({name,dev:me,v:2,seen:Date.now()},{merge:true}).catch(()=>{})};hb();SI(hb,25000);
 db.collection('players').onSnapshot(s=>{const pd=s.docs.filter(d=>d.data().v===2);window.__stPlayers=pd.map(d=>Object.assign({},d.data(),{uid:d.id}));if(window.__stRenderSearch)window.__stRenderSearch();const n=Date.now(),l=pd.map(d=>d.data()).filter(d=>d&&n-d.seen<70000).map(d=>esc(d.name));$$('mpOnline').innerHTML='🟢 Đang online ('+l.length+'): '+l.join(', ')},()=>{});
 /* ghim + tin nhắn */
 db.doc('admin/pinned').onSnapshot(s=>{const d=s.exists&&s.data();pin.classList.toggle('hidden',!(d&&d.text));if(d&&d.text)pin.innerHTML='📌 <b>Ghim từ Admin:</b> '+esc(d.text)},()=>{});
@@ -690,7 +635,7 @@ chatLog.addEventListener('click',e=>{const i=e.target.closest&&e.target.closest(
 function safeTime(t){return window.__VID?__VID.fmtDT(t):new Date(Number(t)||Date.now()).toLocaleString()}
 db.collection('chat').orderBy('ts','desc').limit(40).onSnapshot(s=>{
  const rows=s.docs.map(d=>({id:d.id,...d.data()})).reverse();
- __VID.safeSet(chatLog,rows.map(m=>`<div style="padding:5px 2px;border-bottom:1px solid #30223d"><b style="color:#d5b7ff">${esc(m.name||'Người chơi')}</b> <span class="small">${safeTime(m.ts)}</span>${chatBody(m)}</div>`).join('')||'<div class="small">Chưa có tin nhắn.</div>');
+ __VID.safeSet(chatLog,rows.map(m=>`<div style="padding:5px 2px;border-bottom:1px solid #30223d"><b style="color:#d5b7ff">${esc(m.name||'Người chơi')}</b>${window.__TT?__TT.badge(m.uid):''} <span class="small">${safeTime(m.ts)}</span>${chatBody(m)}${window.__TT?__TT.links(m.text):''}</div>`).join('')||'<div class="small">Chưa có tin nhắn.</div>');
  chatLog.scrollTop=chatLog.scrollHeight;
 },()=>{chatLog.innerHTML='<div class="small">Không tải được chat. Kiểm tra Firestore Rules.</div>'});
 async function sendChat(){
@@ -871,6 +816,8 @@ const say=m=>{try{if(window.__G&&window.__G.toast)return window.__G.toast(m)}cat
 const sec=document.createElement('section');sec.className='extra-grid';sec.style.gridTemplateColumns='1fr';
 sec.innerHTML=`<div class="extra-card" id="soPanel"><h2>👥 Bạn bè & Nhóm <span id="soDot"></span></h2>
 <div style="display:flex;align-items:center;gap:6px"><div class="small" id="soMsg" style="flex:1">Kết bạn để chat riêng, hoặc tạo nhóm chat.</div><button class="pill" id="soNotif" style="flex-shrink:0"></button></div>
+<div style="display:flex;gap:6px;align-items:center;margin:6px 0"><span class="small" style="flex-shrink:0">🎵 TikTok @</span><input id="soTTIn" class="field" maxlength="24" placeholder="tên TikTok của bạn" autocomplete="off" style="flex:1;min-width:0;margin:0"><button class="pill" id="soTTSave" style="flex-shrink:0">Lưu</button></div>
+<div class="small" id="soTTMsg"></div>
 <div id="soTabs" style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap"><button class="pill" data-tab="f" id="soTf">Bạn bè</button><button class="pill" data-tab="g" id="soTg">Nhóm</button><button class="pill" data-tab="r" id="soTr">Lời mời</button></div>
 <div id="soF"><input id="soSearch" class="field" maxlength="24" placeholder="🔍 Gõ tên người chơi để kết bạn"><div id="soRes" style="margin:4px 0"></div><div class="small" style="margin-top:6px"><b>Bạn bè</b></div><div id="soFl"></div></div>
 <div id="soG" class="hidden"><div class="small"><b>Tạo nhóm</b></div><div style="display:flex;gap:6px"><select id="soGIcon" class="mpsel" style="width:auto;margin:0"><option>👥</option><option>🔥</option><option>💀</option><option>👻</option><option>⚔️</option><option>👑</option><option>🐉</option><option>🌙</option><option>🎮</option><option>💎</option></select><input id="soGName" class="field" maxlength="24" placeholder="Tên nhóm" style="flex:1;min-width:0"></div><div id="soGPick" class="small" style="margin:4px 0"></div><button id="soGMake" class="wide-btn">➕ Tạo nhóm</button><div class="small" style="margin-top:8px"><b>Nhóm của bạn</b></div><div id="soGl"></div></div>
@@ -905,9 +852,9 @@ function renderSearch(){const q=$('soSearch').value.trim().toLowerCase(),o=$('so
  const l=players().filter(p=>p&&p.name&&p.uid!==pid&&String(p.name).toLowerCase().includes(q)).sort((a,b)=>(b.seen||0)-(a.seen||0)).slice(0,8);
  o.innerHTML=l.map(p=>{const f=fr.find(x=>x.other===p.uid);let b;
   if(!f)b=btn('add',p.uid,'➕ Kết bạn');else if(f.status==='accepted')b=btn('chat',f.id,'💬 Chat');else if(f.from===pid)b='<span class="small">⏳ Đã gửi</span>';else b=btn('acc',f.id,'✔ Chấp nhận');
-  return row((online(p.uid)?'🟢':'⚪')+' <b>'+esc(p.name)+'</b>',b)}).join('')||'<div class="small">Không có người chơi tên này (họ cần mở bản mới).</div>'}
+  return row((online(p.uid)?'🟢':'⚪')+' <b>'+esc(p.name)+'</b>'+(window.__TT?__TT.badgeP(p):''),b)}).join('')||'<div class="small">Không có người chơi tên này (họ cần mở bản mới).</div>'}
 function renderFriends(){const l=accepted();
- $('soFl').innerHTML=l.map(f=>row((online(f.other)?'🟢':'⚪')+' <b>'+esc(nameOf(f,f.other))+'</b> '+(unread('d_'+f.id)?'🔴':''),btn('chat',f.id,'💬')+btn('mute','d_'+f.id,bell('d_'+f.id))+btn('del',f.id,'🗑️'))).join('')||'<div class="small">Chưa có bạn bè. Gõ tên ở ô tìm kiếm để kết bạn.</div>'}
+ $('soFl').innerHTML=l.map(f=>row((online(f.other)?'🟢':'⚪')+' <b>'+esc(nameOf(f,f.other))+'</b>'+(window.__TT?__TT.badge(f.other):'')+' '+(unread('d_'+f.id)?'🔴':''),btn('chat',f.id,'💬')+btn('mute','d_'+f.id,bell('d_'+f.id))+btn('del',f.id,'🗑️'))).join('')||'<div class="small">Chưa có bạn bè. Gõ tên ở ô tìm kiếm để kết bạn.</div>'}
 function renderReq(){const inc=fr.filter(f=>f.status==='pending'&&f.from!==pid),out=fr.filter(f=>f.status==='pending'&&f.from===pid);
  $('soR').innerHTML='<div class="small"><b>Lời mời nhận được</b></div>'+(inc.map(f=>row('<b>'+esc(nameOf(f,f.other))+'</b> muốn kết bạn',btn('acc',f.id,'✔')+btn('del',f.id,'✖'))).join('')||'<div class="small">Không có lời mời.</div>')+'<div class="small" style="margin-top:8px"><b>Đã gửi</b></div>'+(out.map(f=>row(esc(nameOf(f,f.other)),btn('del',f.id,'Hủy'))).join('')||'<div class="small">Chưa gửi lời mời nào.</div>')}
 function renderGroups(){const keep=new Set([...document.querySelectorAll('#soGPick input:checked')].map(x=>x.value));
@@ -916,7 +863,7 @@ function renderGroups(){const keep=new Set([...document.querySelectorAll('#soGPi
 function renderAll(){renderSearch();renderFriends();renderReq();renderGroups();
  const inc=fr.filter(f=>f.status==='pending'&&f.from!==pid).length,uf=accepted().some(f=>unread('d_'+f.id)),ug=groups.some(g=>unread('g_'+g.id));
  $('soTf').textContent='Bạn bè'+(uf?' 🔴':'');$('soTg').textContent='Nhóm'+(ug?' 🔴':'');$('soTr').textContent='Lời mời'+(inc?' ('+inc+')':'');
- $('soDot').textContent=(inc||uf||ug)?'🔴':'';$('soNotif').textContent=notifOn?'🔔 Bật':'🔕 Tắt';if(cur)$('soBell').textContent=bell(cur.room);if(cur&&cur.gid)renderGInfo()}
+ $('soDot').textContent=(inc||uf||ug)?'🔴':'';{const mt=((window.__stPlayers||[]).find(p=>p.uid===pid)||{}).tiktok;if(mt&&!ttIn.value&&document.activeElement!==ttIn)ttIn.value=mt}$('soNotif').textContent=notifOn?'🔔 Bật':'🔕 Tắt';if(cur)$('soBell').textContent=bell(cur.room);if(cur&&cur.gid)renderGInfo()}
 function watchRooms(){[...accepted().map(f=>'d_'+f.id),...groups.map(g=>'g_'+g.id)].forEach(r=>{if(watched[r])return;
  watched[r]=db.collection('rooms').doc(r).collection('msgs').orderBy('ts','desc').limit(1).onSnapshot(s=>{const first=!(r in lastMsg),prev=lastMsg[r],m=s.docs[0]?s.docs[0].data():null;lastMsg[r]=m;if(!first&&m&&m.from!==pid&&(!prev||(m.ts||0)>(prev.ts||0)))notify(r,m);if(cur&&cur.room===r&&!document.hidden)markRead(r);renderAll()},()=>{})})}
 
@@ -924,7 +871,7 @@ function showTab(t){const sk=document.getElementById('soStk');if(sk)sk.classList
 function openChat(room,title,gid){showTab('f');['soF','soG','soR'].forEach(i=>$(i).classList.add('hidden'));$('soTabs').classList.add('hidden');$('soC').classList.remove('hidden');
  cur={room,gid:gid||null};$('soCT').textContent=(gid?(((groups.find(x=>x.id===gid)||{}).icon||'👥')+' '):'💬 ')+title;$('soGM').classList.toggle('hidden',!gid);$('soGInfo').classList.add('hidden');$('soLog').innerHTML='Đang tải…';
  unsub=db.collection('rooms').doc(room).collection('msgs').orderBy('ts','desc').limit(60).onSnapshot(s=>{const L=s.docs.map(d=>d.data()).reverse(),o=$('soLog');
-  __VID.safeSet(o,L.map(m=>`<div class="mpmsg"><b style="color:${m.from===pid?'#f5ce72':'#cdb3ff'}">${esc(m.name)}</b> <span class="small">${window.__VID?__VID.fmtDT(m.ts):''}</span>${bodyOf(m)}</div>`).join('')||'<div class="small">Chưa có tin nhắn. Hãy nói xin chào!</div>');
+  __VID.safeSet(o,L.map(m=>`<div class="mpmsg"><b style="color:${m.from===pid?'#f5ce72':'#cdb3ff'}">${esc(m.name)}</b>${window.__TT?__TT.badge(m.from):''} <span class="small">${window.__VID?__VID.fmtDT(m.ts):''}</span>${bodyOf(m)}${window.__TT?__TT.links(m.text):''}</div>`).join('')||'<div class="small">Chưa có tin nhắn. Hãy nói xin chào!</div>');
   o.scrollTop=o.scrollHeight;markRead(room);renderAll()},e=>{$('soLog').textContent='Không đọc được tin nhắn (cập nhật Firestore Rules).'})}
 function renderGInfo(){const g=groups.find(x=>x.id===cur.gid),o=$('soGInfo');if(!g){return}
  const cand=accepted().filter(f=>!(g.members||[]).includes(f.other));
@@ -982,6 +929,11 @@ $('soGMake').onclick=async()=>{const n=$('soGName').value.trim().slice(0,24);if(
  const sel=[...document.querySelectorAll('#soGPick input:checked')].map(x=>x.value).slice(0,19),names={[pid]:String(name).slice(0,24)};
  sel.forEach(u=>{const f=fr.find(x=>x.other===u);names[u]=nameOf(f,u)});
  try{await db.collection('groups').add({name:n,icon:$('soGIcon').value,owner:pid,members:[pid,...sel],names,ts:Date.now()});$('soGName').value='';say('Đã tạo nhóm')}catch(e){say('Lỗi tạo nhóm: '+(e.message||e))}};
+const ttIn=$('soTTIn');try{ttIn.value=localStorage.getItem('so_tt_'+pid)||''}catch(e){}
+$('soTTSave').onclick=async()=>{const h=ttIn.value.trim().replace(/^@/,'');
+ if(h&&!(window.__TT&&__TT.validHandle(h)))return say('Tên TikTok chỉ gồm chữ, số, dấu _ và dấu chấm (2–24 ký tự)');
+ try{await db.doc('players/'+pid).set({tiktok:h||FV.delete()},{merge:true});try{localStorage.setItem('so_tt_'+pid,h)}catch(e){}
+  $('soTTMsg').textContent=h?'✅ Hồ sơ TikTok của bạn: @'+h+' (bạn tự nhập, chưa được TikTok xác minh)':'Đã xóa liên kết TikTok.'}catch(e){say('Lỗi lưu: '+(e.message||e))}};
 $('soNotif').onclick=()=>{notifOn=!notifOn;try{localStorage.setItem(NK,notifOn?'1':'0')}catch(e){}if(notifOn&&'Notification' in window&&Notification.permission==='default'){try{Notification.requestPermission()}catch(e){}}renderAll();say(notifOn?'🔔 Đã bật thông báo tin nhắn':'🔕 Đã tắt mọi thông báo tin nhắn')};
 $('soBell').onclick=()=>{if(cur)act('mute',cur.room)};
 showTab('f');
@@ -1067,4 +1019,54 @@ window.__VID=api;
 /* Bật video: đổi false thành true (cần bật Firebase Storage / gói Blaze) */
 api.enabled=false;
 if(!api.enabled){const st=document.createElement('style');st.textContent='#stVidBtn,#soVidBtn,#stVidProg,#soVidProg{display:none!important}';document.head.appendChild(st)}
+})();</script><script>(function(){
+const HANDLE=/^[A-Za-z0-9_.]{2,24}$/;
+const H=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const validHandle=h=>HANDLE.test(String(h||''));
+const hostOK=h=>h==='tiktok.com'||h.endsWith('.tiktok.com');
+function parse(t){t=String(t||'').trim();if(!t)return null;if(/^\d{15,25}$/.test(t))return{id:t,user:null};
+ let u;try{u=new URL(/^https?:\/\//i.test(t)?t:'https://'+t)}catch(e){return null}
+ if(u.protocol!=='https:'&&u.protocol!=='http:')return null;
+ const h=u.hostname.toLowerCase();if(!hostOK(h))return null;
+ const m=u.pathname.match(/^\/(?:@([A-Za-z0-9_.]{1,40})\/(?:video|photo)\/|share\/video\/|player\/v1\/|embed\/v2\/|v\/)(\d{8,25})/i);
+ if(m)return{id:m[2],user:m[1]||null};
+ if(/^\/t\/[\w-]+\/?$/.test(u.pathname)||(/^(vm|vt)\./.test(h)&&u.pathname.length>1))return{short:'https://'+h+u.pathname+u.search};
+ return null}
+function findLink(text){const urls=String(text||'').match(/(?:https?:\/\/)?(?:[a-z0-9-]+\.)?tiktok\.com\/[^\s<>"']+/gi)||[];
+ for(const x of urls.slice(0,3)){const p=parse(x);if(p)return p}return null}
+const BTN='class="buy" style="min-width:auto;padding:6px 10px;margin:4px 0"';
+function links(text){const p=findLink(text);if(!p)return '';
+ if(p.id)return '<div><button type="button" '+BTN+' data-tt="'+p.id+'" data-ttu="'+H(p.user||'')+'">▶ Xem video TikTok</button></div>';
+ return '<div><button type="button" '+BTN+' data-ttshort="'+H(p.short)+'">▶ Xem video TikTok</button></div>'}
+const handleOf=uid=>{const p=(window.__stPlayers||[]).find(x=>x.uid===uid);return p&&validHandle(p.tiktok)?p.tiktok:''};
+const badgeH=h=>h?' <a href="https://www.tiktok.com/@'+h+'" target="_blank" rel="noopener noreferrer" title="Hồ sơ TikTok (người chơi tự nhập)" style="color:#7fe0ff;font-size:.82rem;text-decoration:none">🎵@'+h+'</a>':'';
+const badge=uid=>badgeH(handleOf(uid)),badgeP=p=>badgeH(p&&validHandle(p.tiktok)?p.tiktok:'');
+const say=m=>{try{if(window.__G&&window.__G.toast)return window.__G.toast(m)}catch(e){}};
+let ov=null;
+function close(){if(ov){ov.remove();ov=null;document.body.style.overflow=''}}
+function open(id,user){close();
+ const okU=user&&validHandle(user)?user:'';
+ ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;z-index:2147483300;background:#000e;display:flex;flex-direction:column;align-items:center;overflow:auto;padding:calc(10px + env(safe-area-inset-top,0px)) 10px 24px';
+ ov.innerHTML='<div style="width:100%;max-width:340px;display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="flex:1;color:#f5ce72;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📺 Video TikTok'+(okU?' · <a href="https://www.tiktok.com/@'+okU+'" target="_blank" rel="noopener noreferrer" style="color:#7fe0ff">@'+okU+'</a>':'')+'</b><button type="button" id="ttClose" class="wide-btn" style="width:auto;margin:0;padding:8px 14px">✕ Đóng</button></div>'
+  +'<iframe id="ttFrame" src="https://www.tiktok.com/player/v1/'+id+'?music_info=1&description=1&autoplay=1&muted=1" width="325" height="578" style="border:0;border-radius:12px;max-width:100%;background:#000" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe>'
+  +'<div class="small" id="ttErr" style="max-width:340px;margin-top:8px;color:#d9c9f5"></div>'
+  +'<a href="https://www.tiktok.com/'+(okU?'@'+okU+'/video/':'share/video/')+id+'" target="_blank" rel="noopener noreferrer" style="color:#7fe0ff;margin-top:8px">Mở trên TikTok ↗</a>';
+ document.body.appendChild(ov);document.body.style.overflow='hidden';
+ ov.querySelector('#ttClose').onclick=close;ov.addEventListener('click',e=>{if(e.target===ov)close()})}
+window.addEventListener('message',e=>{const d=e.data;if(!d||typeof d!=='object'||!d['x-tiktok-player']||d.type!=='onPlayerError')return;
+ const el=document.getElementById('ttErr');if(el)el.textContent='Không phát được video này (có thể đã bị xóa, riêng tư hoặc bị giới hạn). Thử bấm "Mở trên TikTok".'});
+const SHORT_HINT='Link rút gọn chưa mở được ở đây. Hãy mở video trên TikTok, bấm Chia sẻ → Sao chép liên kết, hoặc dán link dạng tiktok.com/@ten/video/số.';
+async function openShort(url,onMsg){
+ try{const r=await fetch('https://www.tiktok.com/oembed?url='+encodeURIComponent(url));if(!r.ok)throw 0;const j=await r.json();
+  const m=String(j.html||'').match(/player\/v1\/(\d{8,25})/)||String(j.html||'').match(/data-video-id="(\d{8,25})"/);
+  if(!m)throw 0;const um=String(j.author_url||'').match(/tiktok\.com\/@([A-Za-z0-9_.]{1,40})/);open(m[1],um?um[1]:null);if(onMsg)onMsg('')}
+ catch(e){if(onMsg)onMsg(SHORT_HINT);else say(SHORT_HINT)}}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tt],[data-ttshort]');if(!b)return;e.preventDefault();
+ if(b.dataset.tt)open(b.dataset.tt,b.dataset.ttu);else openShort(b.dataset.ttshort)});
+const go=document.getElementById('ttGo'),inp=document.getElementById('ttLink'),msg=document.getElementById('ttMsg');
+if(go&&inp)go.onclick=()=>{const p=parse(inp.value);
+ if(!p){msg.textContent='❌ Link không đúng. Hãy dán link video TikTok (tiktok.com/@ten/video/số).';return}
+ msg.textContent='';if(p.id){open(p.id,p.user)}else openShort(p.short,t=>{msg.textContent=t})};
+if(inp)inp.addEventListener('keydown',e=>{if(e.key==='Enter')go.click()});
+window.__TT={parse,findLink,links,badge,badgeP,validHandle,open};
 })();</script></body></html>
