@@ -651,11 +651,17 @@ async function sendSticker(e){
 }
 $$('stStickerBtn').onclick=()=>{const p=$$('stStickerPanel');p.classList.toggle('hidden');if(!p.classList.contains('hidden'))drawStickers()};
 const IMG_RE=/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/;let lastImgAt=0;
+// Anti Color Chat: chat content is always plain text with a fixed theme.
+function cleanChatText(value){
+ const raw=String(value??'').slice(0,300);
+ return raw.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g,'')
+           .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g,'');
+}
 function chatBody(m){let h='';
  if(STICKER_ALL.includes(m.sticker))h+=`<div style="font-size:3.2rem;line-height:1.15;padding:2px 0">${m.sticker}</div>`;
  if(typeof m.image==='string'&&m.image.length<=250000&&IMG_RE.test(m.image))h+=`<img class="stChatImg" src="${m.image}" alt="ảnh" style="display:block;max-width:100%;max-height:220px;border-radius:10px;margin:4px 0;cursor:zoom-in">`;
  if(m.video&&window.__VID)h+=__VID.html(m.video,m.vdur);
- if(m.text)h+=`<div style="overflow-wrap:anywhere">${esc(m.text)}</div>`;
+ if(m.text)h+=`<div style="overflow-wrap:anywhere;color:#eee">${esc(cleanChatText(m.text))}</div>`;
  return h}
 function compressImage(file){return new Promise((res,rej)=>{
  const url=URL.createObjectURL(file),img=new Image();
@@ -676,7 +682,7 @@ async function sendImage(file){
  if(Date.now()-lastImgAt<2500)return toast('Gửi ảnh chậm lại một chút');
  if(await banBlock())return;
  lastImgAt=Date.now();
- const input=$$('stChatInput'),cap=input.value.trim().slice(0,300);
+ const input=$$('stChatInput'),cap=cleanChatText(input.value.trim());
  try{const data=await compressImage(file);
   await db.collection('chat').add({uid:me,name:String(name).slice(0,24),text:cap,image:data,ts:Date.now()});input.value='';toast('Đã gửi ảnh')}
  catch(e){err(e)}
@@ -691,11 +697,11 @@ chatLog.addEventListener('click',e=>{const i=e.target.closest&&e.target.closest(
 function safeTime(t){return window.__VID?__VID.fmtDT(t):new Date(Number(t)||Date.now()).toLocaleString()}
 db.collection('chat').orderBy('ts','desc').limit(40).onSnapshot(s=>{
  const rows=s.docs.map(d=>({id:d.id,...d.data()})).reverse();
- __VID.safeSet(chatLog,rows.map(m=>`<div style="padding:5px 2px;border-bottom:1px solid #30223d"><b style="color:#d5b7ff">${esc(m.name||'Người chơi')}</b>${window.__TT?__TT.badge(m.uid):''} <span class="small">${safeTime(m.ts)}</span>${chatBody(m)}${window.__TT?__TT.links(m.text):''}</div>`).join('')||'<div class="small">Chưa có tin nhắn.</div>');
+ __VID.safeSet(chatLog,rows.map(m=>`<div style="padding:5px 2px;border-bottom:1px solid #30223d"><b style="color:#eeeeee">${esc(m.name||'Người chơi')}</b>${window.__TT?__TT.badge(m.uid):''} <span class="small">${safeTime(m.ts)}</span>${chatBody(m)}${window.__TT?__TT.links(m.text):''}</div>`).join('')||'<div class="small">Chưa có tin nhắn.</div>');
  chatLog.scrollTop=chatLog.scrollHeight;
 },()=>{chatLog.innerHTML='<div class="small">Không tải được chat. Kiểm tra Firestore Rules.</div>'});
 async function sendChat(){
- const input=$$('stChatInput'),textMsg=input.value.trim();
+ const input=$$('stChatInput'),textMsg=cleanChatText(input.value.trim());
  if(!textMsg)return;
  if(textMsg.length>300)return toast('Tin nhắn tối đa 300 ký tự');
   if(await banBlock())return;
